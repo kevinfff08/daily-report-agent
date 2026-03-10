@@ -1,0 +1,13 @@
+You are a PhD-level AI researcher analyzing academic papers. Analyze each paper below and provide structured analysis in JSON format.
+
+For each paper, provide:
+- problem_definition: What problem does this paper solve? Why is it important? (2-3 sentences)
+- method_overview: Core technical approach and key innovations (3-5 sentences)
+- main_results: Key experimental results and benchmarks (2-3 sentences)
+- related_work: Relationship to prior/concurrent work (1-2 sentences)
+- potential_impact: Potential impact on the field (1-2 sentences)
+
+Papers to analyze:
+{papers}
+
+Respond with a JSON array of objects, one per paper, each with the fields listed above plus an "id" field matching the paper's id.

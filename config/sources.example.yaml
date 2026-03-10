@@ -1,0 +1,55 @@
+# DailyReport 数据源配置示例
+# 复制此文件为 sources.yaml 并按需修改
+
+arxiv:
+  categories:
+    - cs.AI       # Artificial Intelligence
+    - cs.CL       # Computation and Language (NLP)
+    - cs.CV       # Computer Vision
+    - cs.LG       # Machine Learning
+    - cs.SE       # Software Engineering
+  max_results_per_category: 50    # 每个类别最多获取条目数
+
+rss:
+  feeds:
+    # category 取值: "industry" (公司/产品动态), "news" (科技新闻), "academic" (学术博客)
+    - name: "OpenAI Blog"
+      url: "https://openai.com/blog/rss.xml"
+      category: "industry"
+
+    - name: "Anthropic Blog"
+      url: "https://www.anthropic.com/feed"
+      category: "industry"
+
+    - name: "Google AI Blog"
+      url: "https://blog.google/technology/ai/rss/"
+      category: "industry"
+
+    - name: "BAIR Blog"
+      url: "https://bair.berkeley.edu/blog/feed.xml"
+      category: "academic"
+
+    - name: "TechCrunch AI"
+      url: "https://techcrunch.com/category/artificial-intelligence/feed/"
+      category: "news"
+
+    # 添加更多 RSS 源...
+
+reddit:
+  subreddits:
+    - MachineLearning
+    - LocalLLaMA
+  sort: "hot"            # hot / new / top
+  time_filter: "day"     # hour / day / week / month / year / all
+  limit: 25              # 每个子版块最多获取条目数
+
+hackernews:
+  min_score: 50          # 最低分数过滤
+  max_items: 30          # 最多获取条目数
+  keywords:              # 关键词过滤（留空则不过滤）
+    - AI
+    - LLM
+    - machine learning
+    - GPT
+    - Claude
+    - transformer

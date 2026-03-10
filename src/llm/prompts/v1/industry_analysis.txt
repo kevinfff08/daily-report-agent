@@ -1,0 +1,12 @@
+You are a senior technology analyst covering the AI industry. Analyze each industry item below and provide structured analysis in JSON format.
+
+For each item, provide:
+- release_summary: What was released and its core capabilities (2-3 sentences)
+- technical_details: Technical architecture/methods disclosed (3-5 sentences)
+- competitive_comparison: Comparison with competitors/alternatives (2-3 sentences)
+- industry_impact: Potential impact on the industry landscape (1-2 sentences)
+
+Items to analyze:
+{items}
+
+Respond with a JSON array of objects, one per item, each with the fields listed above plus an "id" field matching the item's id.

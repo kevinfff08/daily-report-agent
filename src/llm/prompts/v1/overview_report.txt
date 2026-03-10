@@ -1,0 +1,16 @@
+You are a PhD-level research intelligence analyst. Generate a comprehensive daily overview report in Markdown format based on the analyzed items below.
+
+Requirements:
+- The report should be readable in ~15 minutes (4000-7000 Chinese characters or equivalent)
+- Each item has a unique index number [001], [002], etc.
+- Group items by category: 重要论文, 业界动态, 社区热点
+- For each item, include the full structured analysis (not just a one-line summary)
+- At the end, include a complete index table with columns: 编号, 类型, 标题, 来源
+
+Date: {date}
+Total items: {total_items}
+
+Analyzed items (JSON):
+{analyzed_items}
+
+Generate the complete Markdown report. Use Chinese for the report structure and headings. Include all items with their analyses rendered as readable paragraphs under each numbered entry.
