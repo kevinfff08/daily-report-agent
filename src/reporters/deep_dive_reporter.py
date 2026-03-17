@@ -1,4 +1,7 @@
-"""Stage 2: Deep dive report generator (30-60 min reading)."""
+"""Stage 2: Deep dive report generator (5-10 min reading per item).
+
+Only analyzes the specific items the user selected from the overview.
+"""
 
 from __future__ import annotations
 
@@ -7,8 +10,8 @@ from datetime import date, datetime
 
 from src.llm.client import LLMClient
 from src.logging_config import get_logger
-from src.models.analysis import AnalyzedItem
 from src.models.report import DeepAnalysis, DeepDiveReport
+from src.models.source import SourceItem
 from src.storage.local_store import LocalStore
 
 logger = get_logger("reporters.deep_dive")
@@ -22,15 +25,38 @@ class DeepDiveReporter:
         self.store = store
 
     async def generate(
-        self, target_date: date, selected_indices: list[int], all_items: list[AnalyzedItem]
+        self,
+        target_date: date,
+        selected_indices: list[int],
+        items_index: list[dict],
     ) -> tuple[DeepDiveReport, str]:
         """Generate deep dive report for selected items.
+
+        Args:
+            target_date: The date of the report
+            selected_indices: User-selected item index numbers
+            items_index: The saved items_index.json data (list of {index, source_item})
 
         Returns:
             Tuple of (DeepDiveReport model, markdown string)
         """
+        # Build index lookup
+        index_map: dict[int, SourceItem] = {}
+        for entry in items_index:
+            idx = entry.get("index", 0)
+            try:
+                index_map[idx] = SourceItem.model_validate(entry["source_item"])
+            except Exception as e:
+                logger.debug("Skipping invalid index entry %d: %s", idx, e)
+
         # Find selected items
-        selected = [item for item in all_items if item.index in selected_indices]
+        selected: list[tuple[int, SourceItem]] = []
+        for idx in selected_indices:
+            if idx in index_map:
+                selected.append((idx, index_map[idx]))
+            else:
+                logger.warning("Item index [%03d] not found in items_index", idx)
+
         if not selected:
             logger.warning("No items found for indices: %s", selected_indices)
             return DeepDiveReport(
@@ -43,7 +69,7 @@ class DeepDiveReporter:
         logger.info(
             "Generating deep dive for %d items: %s",
             len(selected),
-            [f"[{i.index:03d}]" for i in selected],
+            [f"[{i:03d}]" for i, _ in selected],
         )
 
         # Generate deep analysis for each item
@@ -53,8 +79,8 @@ class DeepDiveReporter:
             f"> 选中条目: {', '.join(f'[{i:03d}]' for i in selected_indices)}\n",
         ]
 
-        for item in selected:
-            analysis, md = self._analyze_single(item)
+        for idx, item in selected:
+            analysis, md = self._analyze_single(idx, item)
             analyses.append(analysis)
             markdown_parts.append(md)
 
@@ -77,23 +103,18 @@ class DeepDiveReporter:
         logger.info("Deep dive report saved to %s", output_path)
         return report, full_markdown
 
-    def _analyze_single(self, item: AnalyzedItem) -> tuple[DeepAnalysis, str]:
+    def _analyze_single(self, index: int, item: SourceItem) -> tuple[DeepAnalysis, str]:
         """Generate deep analysis for a single item."""
-        logger.info("Deep diving into [%03d] %s", item.index, item.source_item.title)
-
-        # Serialize the original analysis for context
-        original_analysis = json.dumps(
-            item.analysis.model_dump(mode="json"), ensure_ascii=False, indent=2
-        )
+        logger.info("Deep diving into [%03d] %s", index, item.title)
 
         markdown = self.llm.generate_with_template(
             "deep_dive",
             {
-                "title": item.source_item.title,
-                "source": item.source_item.source_name,
-                "url": item.source_item.url,
-                "original_analysis": original_analysis,
-                "content": item.source_item.content_snippet[:3000],
+                "title": item.title,
+                "source": item.source_name,
+                "url": item.url,
+                "original_analysis": "（首次深度分析，无先前分析）",
+                "content": item.content_snippet[:3000],
             },
             max_tokens=8192,
             temperature=0.3,
@@ -101,8 +122,8 @@ class DeepDiveReporter:
 
         # Parse sections from markdown (best-effort)
         analysis = DeepAnalysis(
-            index=item.index,
-            title=item.source_item.title,
+            index=index,
+            title=item.title,
             background_and_motivation=self._extract_section(markdown, "研究背景与动机", "技术方法详解"),
             technical_deep_dive=self._extract_section(markdown, "技术方法详解", "实验分析"),
             experimental_analysis=self._extract_section(markdown, "实验分析", "局限性与开放问题"),

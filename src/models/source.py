@@ -12,9 +12,13 @@ class SourceType(str, Enum):
     """Type of data source."""
 
     ARXIV_PAPER = "arxiv_paper"
-    RSS_ARTICLE = "rss_article"
-    REDDIT_POST = "reddit_post"
     HACKER_NEWS = "hacker_news"
+    YOUTUBE_VIDEO = "youtube_video"
+    BILIBILI_VIDEO = "bilibili_video"
+    SEMANTIC_SCHOLAR = "semantic_scholar"
+    GITHUB_TRENDING = "github_trending"
+    PRODUCT_HUNT = "product_hunt"
+    TAVILY_SEARCH = "tavily_search"
 
 
 class SourceItem(BaseModel):
@@ -31,7 +35,7 @@ class SourceItem(BaseModel):
     )
     metadata: dict = Field(
         default_factory=dict,
-        description="Source-specific fields (arXiv categories, Reddit score, etc.)",
+        description="Source-specific fields (arXiv categories, YouTube views, etc.)",
     )
 
     @property

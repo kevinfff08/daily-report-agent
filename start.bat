@@ -1,48 +1,48 @@
 @echo off
-REM DailyReport 启动脚本
-REM 激活 conda 环境并显示帮助信息
+chcp 65001 >nul 2>&1
+REM DailyReport startup script
 
 echo ============================================
-echo   DailyReport - 每日情报聚合系统
+echo   DailyReport - Daily Intelligence System
 echo ============================================
 echo.
 
-REM 激活 conda 环境
+REM Activate conda environment
 call conda activate research_tools
 if errorlevel 1 (
-    echo [ERROR] 无法激活 conda 环境 research_tools
-    echo 请确保已安装 conda 并创建了 research_tools 环境
+    echo [ERROR] Failed to activate conda env: research_tools
+    echo Please ensure conda is installed and research_tools env exists
     pause
     exit /b 1
 )
 
-echo [OK] conda 环境 research_tools 已激活
+echo [OK] conda env research_tools activated
 echo.
 
-REM 检查 .env 文件
+REM Check .env file
 if not exist "%~dp0.env" (
-    echo [WARN] 未找到 .env 文件，请复制 .env.example 并配置
+    echo [WARN] .env not found. Please copy and configure:
     echo        copy .env.example .env
     echo.
 )
 
-REM 检查 config/sources.yaml
+REM Check config/sources.yaml
 if not exist "%~dp0config\sources.yaml" (
-    echo [WARN] 未找到 config/sources.yaml，请复制示例配置
+    echo [WARN] config/sources.yaml not found. Please copy:
     echo        copy config\sources.example.yaml config\sources.yaml
     echo.
 )
 
-REM 显示帮助
+REM Show help
 python -m src.cli --help
 echo.
 echo ============================================
-echo 常用命令:
-echo   python -m src.cli status                    查看系统状态
-echo   python -m src.cli collect                    采集今日数据
-echo   python -m src.cli report                     生成概览报告
-echo   python -m src.cli deep-dive --items "1,2,3"  生成深度报告
-echo   python -m src.cli run                        全流程执行
+echo Commands:
+echo   python -m src.cli status                    Show system status
+echo   python -m src.cli collect                    Collect today's data
+echo   python -m src.cli report                     Generate overview report
+echo   python -m src.cli deep-dive --items "1,2,3"  Generate deep dive report
+echo   python -m src.cli run                        Run full pipeline
 echo ============================================
 echo.
 

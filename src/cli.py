@@ -26,7 +26,7 @@ app = typer.Typer(
 )
 
 
-def _get_orchestrator():
+def _get_orchestrator() -> "DailyReportOrchestrator":
     """Create the orchestrator from environment config."""
     from src.orchestrator import DailyReportOrchestrator
 
@@ -55,8 +55,8 @@ def _parse_date(date_str: str | None) -> date:
 @app.command()
 def collect(
     target_date: str = typer.Option(None, "--date", "-d", help="Target date (YYYY-MM-DD), defaults to today"),
-    sources: str = typer.Option(None, "--sources", "-s", help="Comma-separated sources: arxiv,rss,reddit,hackernews"),
-):
+    sources: str = typer.Option(None, "--sources", "-s", help="Comma-separated sources: arxiv,hackernews,youtube,bilibili,semantic_scholar,github_trending,product_hunt,tavily"),
+) -> None:
     """Collect data from configured sources."""
     d = _parse_date(target_date)
     source_list = [s.strip() for s in sources.split(",")] if sources else None
@@ -79,8 +79,8 @@ def collect(
 @app.command()
 def report(
     target_date: str = typer.Option(None, "--date", "-d", help="Target date (YYYY-MM-DD)"),
-):
-    """Generate Stage 1 overview report (collect + analyze + report)."""
+) -> None:
+    """Generate Stage 1 overview report (collect if needed + 3 LLM calls)."""
     d = _parse_date(target_date)
     console.print(Panel(f"[bold]Generating overview report for {d}[/bold]", style="blue"))
 
@@ -91,11 +91,6 @@ def report(
         console.print("[yellow]No raw data found. Collecting first...[/yellow]")
         asyncio.run(orch.collect(d))
 
-    # Check if we have analyzed data, if not analyze first
-    if not orch.store.has_analyzed_data(d):
-        console.print("[yellow]No analyzed data found. Analyzing...[/yellow]")
-        asyncio.run(orch.analyze(d))
-
     overview, markdown = asyncio.run(orch.generate_overview(d))
     console.print(f"\n[bold green]Report generated: {overview.total_items} items[/bold green]")
     console.print(f"Output: output/{d.isoformat()}/daily_report.md")
@@ -103,9 +98,9 @@ def report(
 
 @app.command(name="deep-dive")
 def deep_dive(
-    items: str = typer.Option(..., "--items", "-i", help="Comma-separated item indices, e.g. '001,003,015'"),
+    items: str = typer.Option(..., "--items", "-i", help="Comma-separated item indices, e.g. '1,3,15'"),
     target_date: str = typer.Option(None, "--date", "-d", help="Target date (YYYY-MM-DD)"),
-):
+) -> None:
     """Generate Stage 2 deep dive report for selected items."""
     d = _parse_date(target_date)
 
@@ -126,8 +121,12 @@ def deep_dive(
 
     orch = _get_orchestrator()
 
-    if not orch.store.has_analyzed_data(d):
-        console.print("[red]No analyzed data found. Run 'report' first.[/red]")
+    # Check for items_index (created by overview report)
+    items_index = orch.store.load_json(
+        f"reports/{d.isoformat()}/items_index.json"
+    )
+    if not items_index:
+        console.print("[red]No items index found. Run 'report' first to generate the overview.[/red]")
         raise typer.Exit(1)
 
     report_model, markdown = asyncio.run(orch.generate_deep_dive(d, indices))
@@ -138,8 +137,8 @@ def deep_dive(
 @app.command()
 def run(
     target_date: str = typer.Option(None, "--date", "-d", help="Target date (YYYY-MM-DD)"),
-):
-    """Execute full pipeline: collect + analyze + overview report."""
+) -> None:
+    """Execute full pipeline: collect + overview report."""
     d = _parse_date(target_date)
     console.print(Panel(f"[bold]Running full pipeline for {d}[/bold]", style="blue"))
 
@@ -150,7 +149,7 @@ def run(
 
 
 @app.command()
-def status():
+def status() -> None:
     """Show system configuration and data status."""
     orch = _get_orchestrator()
     info = orch.get_status()
@@ -164,9 +163,13 @@ def status():
     config_table.add_row("LLM Model", info["llm_model"])
     config_table.add_row("Collectors", ", ".join(info["collectors"]))
     config_table.add_row("arXiv Categories", ", ".join(info["config"]["arxiv_categories"]))
-    config_table.add_row("RSS Feeds", str(info["config"]["rss_feeds"]))
-    config_table.add_row("Reddit Subreddits", ", ".join(info["config"]["reddit_subreddits"]))
     config_table.add_row("HN Min Score", str(info["config"]["hn_min_score"]))
+    config_table.add_row("YouTube Channels", str(info["config"]["youtube_channels"]))
+    config_table.add_row("Bilibili Users", str(info["config"]["bilibili_users"]))
+    config_table.add_row("S2 Topics", ", ".join(info["config"]["semantic_scholar_topics"]))
+    config_table.add_row("GH Languages", ", ".join(info["config"]["github_trending_languages"]))
+    config_table.add_row("PH Topics", ", ".join(info["config"]["product_hunt_topics"]))
+    config_table.add_row("Tavily Searches", str(info["config"]["tavily_searches"]))
     console.print(config_table)
 
     # Data

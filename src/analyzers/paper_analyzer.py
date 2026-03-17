@@ -87,7 +87,7 @@ class PaperAnalyzer:
             results.append(AnalyzedItem(
                 index=start_index + i,
                 source_item=item,
-                source_type=SourceType.ARXIV_PAPER,
+                source_type=item.source_type,
                 category="论文",
                 analysis=paper_analysis,
             ))
@@ -101,7 +101,7 @@ class PaperAnalyzer:
             results.append(AnalyzedItem(
                 index=start_index + i,
                 source_item=item,
-                source_type=SourceType.ARXIV_PAPER,
+                source_type=item.source_type,
                 category="论文",
                 analysis=PaperAnalysis(
                     problem_definition=item.content_snippet[:300] if item.content_snippet else "No abstract.",

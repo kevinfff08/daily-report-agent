@@ -24,7 +24,11 @@ class LLMClient:
         model: str = "claude-sonnet-4-20250514",
         base_url: str | None = None,
     ):
-        self.api_key = api_key or ""
+        # In proxy mode (base_url set), use a placeholder key if none provided
+        if base_url and not api_key:
+            self.api_key = "placeholder-for-proxy"
+        else:
+            self.api_key = api_key or ""
         self.model = model
         self.base_url = base_url
         self._client: Anthropic | None = None

@@ -18,7 +18,7 @@ def mock_orchestrator():
     orch.store = MagicMock()
     orch.store.has_raw_data.return_value = False
     orch.store.has_analyzed_data.return_value = False
-    orch.collect = AsyncMock(return_value={"arxiv": [], "rss": []})
+    orch.collect = AsyncMock(return_value={"arxiv": [], "hackernews": []})
     orch.analyze = AsyncMock(return_value=[])
     orch.generate_overview = AsyncMock(return_value=(
         MagicMock(total_items=0), ""
@@ -29,12 +29,17 @@ def mock_orchestrator():
     orch.run = AsyncMock(return_value=Path("output/2026-03-10/daily_report.md"))
     orch.get_status.return_value = {
         "llm_model": "test-model",
-        "collectors": ["arxiv", "rss", "reddit", "hackernews"],
+        "collectors": ["arxiv", "hackernews", "youtube", "bilibili",
+                        "semantic_scholar", "github_trending", "product_hunt", "tavily"],
         "config": {
             "arxiv_categories": ["cs.AI"],
-            "rss_feeds": 3,
-            "reddit_subreddits": ["MachineLearning"],
             "hn_min_score": 50,
+            "youtube_channels": 3,
+            "bilibili_users": 0,
+            "semantic_scholar_topics": ["large language models"],
+            "github_trending_languages": ["python"],
+            "product_hunt_topics": ["artificial-intelligence"],
+            "tavily_searches": 5,
         },
         "data": {
             "raw_dates": ["2026-03-10"],
@@ -67,7 +72,7 @@ class TestCLI:
 
     def test_collect_with_sources(self, mock_orchestrator):
         with patch("src.cli._get_orchestrator", return_value=mock_orchestrator):
-            result = runner.invoke(app, ["collect", "--sources", "arxiv,rss"])
+            result = runner.invoke(app, ["collect", "--sources", "arxiv,hackernews"])
 
         assert result.exit_code == 0
 

@@ -105,4 +105,4 @@ class TestPaperAnalyzer:
         assert len(results) == 2
         assert results[0].index == 5
         assert results[1].index == 6
-        assert all(r.source_type == SourceType.ARXIV_PAPER for r in results)
+        assert all(r.source_type == items[i].source_type for i, r in enumerate(results))

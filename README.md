@@ -1,10 +1,16 @@
 # DailyReport — 每日 AI/ML 情报聚合系统
 
-PhD-level 每日情报聚合工具，监控 arXiv 论文、公司博客、科技新闻、Reddit/HN 社区动态，生成两阶段深度报告。
+PhD-level 每日情报聚合工具，监控 arXiv 论文、大厂官方博客、视频博主、开源项目、新产品发布、社区动态，生成两阶段深度报告。
 
 ## 功能特性
 
-- **多源数据采集**：arXiv 论文、RSS 订阅（公司博客/新闻/学术博客）、Reddit、Hacker News
+- **8 源数据采集**：
+  - **学术论文**：arXiv API + Semantic Scholar API
+  - **大厂博客**：Tavily Search 定向搜索（OpenAI、Anthropic、Google DeepMind、Meta、Microsoft、NVIDIA 等 10 家）
+  - **视频博主**：YouTube Data API + Bilibili API
+  - **开源项目**：GitHub Trending
+  - **新产品**：Product Hunt GraphQL API
+  - **社区热点**：Hacker News Firebase API
 - **Claude LLM 驱动分析**：批量结构化分析（论文/业界/社区三类分析器）
 - **两阶段报告系统**：
   - **Stage 1 概览报告**（~15 分钟阅读）：全量覆盖，带编号索引，PhD-level 信息密度
@@ -18,19 +24,19 @@ PhD-level 每日情报聚合工具，监控 arXiv 论文、公司博客、科技
 
 - Python 3.12+
 - Conda（推荐使用 `research_tools` 环境）
-- Anthropic API Key
+- API Keys（见下方配置部分）
 
 ### 安装依赖
 
 ```bash
 conda activate research_tools
-pip install feedparser PyYAML
+pip install -e .
 ```
 
-或通过 pyproject.toml 安装：
+开发环境（含测试依赖）：
 
 ```bash
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 ### 配置
@@ -41,11 +47,18 @@ pip install -e .
 cp .env.example .env
 ```
 
-编辑 `.env`，填入你的 API Key：
+编辑 `.env`，填入 API Keys：
 
 ```
-LLM_MODE=api-key
-ANTHROPIC_API_KEY=sk-ant-...
+# 必需
+ANTHROPIC_API_KEY=sk-ant-...    # Claude LLM 调用
+YOUTUBE_API_KEY=AIza...          # YouTube 视频采集
+TAVILY_API_KEY=tvly-...          # 大厂博客搜索
+PRODUCT_HUNT_TOKEN=...           # Product Hunt 新产品
+
+# 可选
+SEMANTIC_SCHOLAR_API_KEY=        # 提高 Semantic Scholar 速率限制
+GITHUB_TOKEN=ghp_...             # 提高 GitHub 速率限制
 ```
 
 2. **数据源配置**：复制并编辑 `config/sources.yaml`
@@ -54,7 +67,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 cp config/sources.example.yaml config/sources.yaml
 ```
 
-按需调整 arXiv 类别、RSS 源列表、Reddit 子版块、HN 过滤条件。
+按需调整各数据源参数：YouTube 频道、Bilibili UP主、arXiv 类别、搜索关键词等。
 
 ## 使用方法
 
@@ -75,7 +88,7 @@ python -m src.cli status
 python -m src.cli collect
 
 # 采集指定日期、指定数据源
-python -m src.cli collect --date 2026-03-10 --sources arxiv,hackernews
+python -m src.cli collect --date 2026-03-10 --sources arxiv,hackernews,youtube
 
 # 生成 Stage 1 概览报告（自动补全缺失的采集/分析步骤）
 python -m src.cli report
@@ -110,77 +123,35 @@ DailyReport/
 │   ├── orchestrator.py           # 核心调度器
 │   ├── logging_config.py         # 集中式日志
 │   ├── models/                   # Pydantic v2 数据模型
-│   │   ├── source.py             # SourceItem, SourceType
-│   │   ├── analysis.py           # AnalyzedItem, PaperAnalysis 等
-│   │   ├── report.py             # DailyOverview, DeepDiveReport
-│   │   └── config.py             # SourceConfig
-│   ├── collectors/               # 数据采集层
-│   │   ├── arxiv_collector.py    # arXiv API
-│   │   ├── rss_collector.py      # RSS/Atom（博客、新闻）
-│   │   ├── reddit_collector.py   # Reddit JSON API
-│   │   └── hacker_news_collector.py  # HN Firebase API
-│   ├── analyzers/                # LLM 分析层
-│   │   ├── paper_analyzer.py     # 论文结构化分析
-│   │   ├── industry_analyzer.py  # 业界动态分析
-│   │   └── social_analyzer.py    # 社区讨论分析
-│   ├── reporters/                # 报告生成层
-│   │   ├── overview_reporter.py  # Stage 1 概览报告
-│   │   └── deep_dive_reporter.py # Stage 2 深度报告
-│   ├── llm/                      # LLM 交互层
-│   │   ├── client.py             # Claude API 封装
-│   │   └── prompts/v1/           # Prompt 模板
-│   └── storage/
-│       └── local_store.py        # JSON 文件持久化
+│   ├── collectors/               # 8 个数据采集器
+│   │   ├── arxiv_collector.py           # arXiv Atom API
+│   │   ├── hacker_news_collector.py     # HN Firebase API
+│   │   ├── youtube_collector.py         # YouTube Data API v3
+│   │   ├── bilibili_collector.py        # Bilibili API (WBI signed)
+│   │   ├── semantic_scholar_collector.py # Semantic Scholar API
+│   │   ├── github_trending_collector.py  # GitHub Trending HTML
+│   │   ├── product_hunt_collector.py    # Product Hunt GraphQL
+│   │   └── tavily_collector.py          # Tavily Search (大厂博客)
+│   ├── analyzers/                # LLM 分析层（论文/业界/社区）
+│   ├── reporters/                # 报告生成层（概览/深度）
+│   ├── llm/                      # Claude API 封装 + Prompt 模板
+│   └── storage/                  # JSON 文件持久化
 ├── config/
-│   ├── sources.yaml              # 数据源配置（gitignored）
+│   ├── sources.yaml              # 数据源配置
 │   └── sources.example.yaml      # 配置示例
 ├── data/                         # 运行时数据（gitignored）
-│   ├── raw/YYYY-MM-DD/           # 原始采集数据
-│   ├── analyzed/YYYY-MM-DD/      # 分析结果
-│   └── reports/YYYY-MM-DD/       # 报告数据模型
-├── output/YYYY-MM-DD/            # 最终报告（gitignored）
+├── output/                       # 最终报告（gitignored）
 ├── logs/                         # 日志文件（gitignored）
-└── tests/                        # 测试套件
+└── tests/                        # 134 个测试
 ```
 
-## 数据流
+## 分析器路由
 
-```
-采集 (collect)           分析 (analyze)           报告 (report)
-┌─────────┐             ┌──────────┐             ┌──────────────┐
-│ arXiv   │──┐          │ Paper    │──┐          │ Overview     │
-│ RSS     │──┤ raw/     │ Industry │──┤ analyzed/│ Reporter     │→ Stage 1
-│ Reddit  │──┤ YYYY-MM-DD│ Social  │──┘ YYYY-MM-DD│              │  报告
-│ HN      │──┘          └──────────┘             └──────────────┘
-                                                  ┌──────────────┐
-                                                  │ Deep Dive    │
-                                                  │ Reporter     │→ Stage 2
-                                                  └──────────────┘  报告
-```
-
-## 配置说明
-
-### arXiv 类别
-
-默认监控：`cs.AI`, `cs.CL`, `cs.CV`, `cs.LG`, `cs.SE`
-
-在 `config/sources.yaml` 中调整 `arxiv.categories`。
-
-### RSS 源
-
-支持三类 RSS 源：
-- `industry`：公司博客（OpenAI、Anthropic、Google AI 等）
-- `news`：科技新闻（TechCrunch AI、The Verge AI 等）
-- `academic`：学术博客（BAIR、Distill.pub 等）
-
-### Reddit
-
-默认子版块：`r/MachineLearning`, `r/LocalLLaMA`
-
-### Hacker News
-
-- `min_score`：最低分数过滤（默认 50）
-- `keywords`：关键词过滤（AI、LLM、machine learning 等）
+| 来源类型 | 分析器 | 输出类别 |
+|---------|--------|---------|
+| arXiv, Semantic Scholar | PaperAnalyzer | 论文 |
+| Tavily Search, Product Hunt | IndustryAnalyzer | 业界动态 |
+| Hacker News, YouTube, Bilibili, GitHub Trending | SocialAnalyzer | 社区热点 |
 
 ## 开发
 
@@ -195,7 +166,6 @@ python -m pytest tests/ -v
 
 - 日志文件：`logs/YYYY-MM-DD.log`（DEBUG 级别）
 - 控制台输出：WARNING+ 级别
-- 格式：`时间 | 级别 | 模块 | 消息`
 
 ### LLM 代理模式
 
@@ -205,14 +175,3 @@ python -m pytest tests/ -v
 LLM_MODE=setup-token
 LLM_PROXY_URL=http://localhost:8317
 ```
-
-## 技术栈
-
-- **运行时**：Python 3.12+, asyncio
-- **CLI**：Typer + Rich
-- **数据模型**：Pydantic v2
-- **HTTP 客户端**：httpx (async)
-- **LLM**：Anthropic Claude API
-- **RSS 解析**：feedparser
-- **配置**：PyYAML
-- **测试**：pytest + pytest-asyncio

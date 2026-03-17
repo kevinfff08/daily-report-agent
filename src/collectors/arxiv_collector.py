@@ -17,7 +17,7 @@ class ArxivCollector(BaseCollector):
 
     source_name = "arxiv"
 
-    ARXIV_API = "http://export.arxiv.org/api/query"
+    ARXIV_API = "https://export.arxiv.org/api/query"
 
     async def collect(self, target_date: date) -> list[SourceItem]:
         categories = self.config.get("categories", ["cs.AI", "cs.CL", "cs.CV", "cs.LG"])

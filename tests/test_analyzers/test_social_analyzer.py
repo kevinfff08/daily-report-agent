@@ -13,14 +13,14 @@ from src.models.source import SourceItem, SourceType
 def make_social_items(n: int) -> list[SourceItem]:
     return [
         SourceItem(
-            id=f"reddit:ml:{i}",
-            source_type=SourceType.REDDIT_POST,
+            id=f"hn:{40000000 + i}",
+            source_type=SourceType.HACKER_NEWS,
             title=f"Discussion about topic {i}",
-            url=f"https://reddit.com/r/ml/comments/{i}",
+            url=f"https://news.ycombinator.com/item?id={40000000 + i}",
             authors=["user"],
             published=datetime(2026, 3, 10, tzinfo=timezone.utc),
             content_snippet=f"Discussion content {i}.",
-            metadata={"score": 100, "num_comments": 50, "source_name": "r/MachineLearning"},
+            metadata={"score": 100, "num_comments": 50, "source_name": "Hacker News"},
         )
         for i in range(n)
     ]
@@ -37,13 +37,13 @@ class TestSocialAnalyzer:
         items = make_social_items(2)
         mock_llm.generate_json_with_template.return_value = [
             {
-                "id": "reddit:ml:0",
+                "id": "hn:40000000",
                 "discussion_core": "Core discussion about topic 0",
                 "key_viewpoints": "Various viewpoints shared",
                 "technical_substance": "Technical details here",
             },
             {
-                "id": "reddit:ml:1",
+                "id": "hn:40000001",
                 "discussion_core": "Core discussion about topic 1",
                 "key_viewpoints": "Viewpoints for topic 1",
                 "technical_substance": "Tech substance 1",

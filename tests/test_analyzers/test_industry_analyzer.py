@@ -13,14 +13,14 @@ from src.models.source import SourceItem, SourceType
 def make_industry_items(n: int) -> list[SourceItem]:
     return [
         SourceItem(
-            id=f"rss:blog:{i}",
-            source_type=SourceType.RSS_ARTICLE,
+            id=f"tavily:blog{i}",
+            source_type=SourceType.TAVILY_SEARCH,
             title=f"Company Announcement {i}",
             url=f"https://example.com/blog/{i}",
             authors=["Company"],
             published=datetime(2026, 3, 10, tzinfo=timezone.utc),
             content_snippet=f"We are excited to announce product {i}.",
-            metadata={"category": "industry", "source_name": "Test Blog"},
+            metadata={"search_name": "Test Blog", "source_name": "Test Blog"},
         )
         for i in range(n)
     ]
@@ -37,14 +37,14 @@ class TestIndustryAnalyzer:
         items = make_industry_items(2)
         mock_llm.generate_json_with_template.return_value = [
             {
-                "id": "rss:blog:0",
+                "id": "tavily:blog0",
                 "release_summary": "Product 0 released",
                 "technical_details": "Uses new architecture",
                 "competitive_comparison": "Better than competitors",
                 "industry_impact": "Significant",
             },
             {
-                "id": "rss:blog:1",
+                "id": "tavily:blog1",
                 "release_summary": "Product 1 released",
                 "technical_details": "Details here",
                 "competitive_comparison": "Comparison here",

@@ -1,4 +1,4 @@
-"""Central orchestrator wiring all collectors, analyzers, and reporters."""
+"""Central orchestrator wiring all collectors and reporters."""
 
 from __future__ import annotations
 
@@ -8,19 +8,22 @@ from pathlib import Path
 
 import yaml
 
-from src.analyzers import IndustryAnalyzer, PaperAnalyzer, SocialAnalyzer
+from src.filters import ItemFilter
 from src.collectors import (
     ArxivCollector,
+    BilibiliCollector,
+    GitHubTrendingCollector,
     HackerNewsCollector,
-    RedditCollector,
-    RSSCollector,
+    ProductHuntCollector,
+    SemanticScholarCollector,
+    TavilyCollector,
+    YouTubeCollector,
 )
 from src.llm.client import LLMClient
 from src.logging_config import get_logger
-from src.models.analysis import AnalyzedItem
 from src.models.config import SourceConfig
 from src.models.report import DailyOverview, DeepDiveReport
-from src.models.source import SourceItem, SourceType
+from src.models.source import SourceItem
 from src.reporters import DeepDiveReporter, OverviewReporter
 from src.storage.local_store import LocalStore
 
@@ -28,7 +31,12 @@ logger = get_logger("orchestrator")
 
 
 class DailyReportOrchestrator:
-    """Main workflow engine for the daily report system."""
+    """Main workflow engine for the daily report system.
+
+    Pipeline:
+        Stage 1: collect → overview report (3 LLM calls, one per category)
+        Stage 2: user selects items → deep dive (1 LLM call per selected item)
+    """
 
     def __init__(
         self,
@@ -46,20 +54,20 @@ class DailyReportOrchestrator:
         )
         self.config = self._load_config(config_dir)
 
-        # Collectors
+        # Collectors (8 sources)
         self.collectors = {
             "arxiv": ArxivCollector(self.store, self.config.arxiv.model_dump()),
-            "rss": RSSCollector(self.store, self.config.rss.model_dump()),
-            "reddit": RedditCollector(self.store, self.config.reddit.model_dump()),
             "hackernews": HackerNewsCollector(self.store, self.config.hackernews.model_dump()),
+            "youtube": YouTubeCollector(self.store, self.config.youtube.model_dump()),
+            "bilibili": BilibiliCollector(self.store, self.config.bilibili.model_dump()),
+            "semantic_scholar": SemanticScholarCollector(self.store, self.config.semantic_scholar.model_dump()),
+            "github_trending": GitHubTrendingCollector(self.store, self.config.github_trending.model_dump()),
+            "product_hunt": ProductHuntCollector(self.store, self.config.product_hunt.model_dump()),
+            "tavily": TavilyCollector(self.store, self.config.tavily.model_dump()),
         }
 
-        # Analyzers
-        self.paper_analyzer = PaperAnalyzer(self.llm, self.store)
-        self.industry_analyzer = IndustryAnalyzer(self.llm, self.store)
-        self.social_analyzer = SocialAnalyzer(self.llm, self.store)
-
-        # Reporters
+        # Filter and reporters
+        self.item_filter = ItemFilter()
         self.overview_reporter = OverviewReporter(self.llm, self.store)
         self.deep_dive_reporter = DeepDiveReporter(self.llm, self.store)
 
@@ -110,13 +118,56 @@ class DailyReportOrchestrator:
         logger.info("Collection complete: %d total items from %d sources", total, len(results))
         return results
 
-    # --- Phase 2: Analyze ---
+    # --- Phase 2: Overview Report (3 LLM calls) ---
 
-    async def analyze(self, target_date: date) -> list[AnalyzedItem]:
-        """Analyze all collected items for a date."""
-        logger.info("=== Phase 2: Analyzing data for %s ===", target_date)
+    async def generate_overview(self, target_date: date) -> tuple[DailyOverview, str]:
+        """Generate Stage 1 overview report: load raw → filter → report."""
+        logger.info("=== Phase 2: Generating overview report for %s ===", target_date)
 
-        # Load raw data
+        all_items = self._load_all_raw_items(target_date)
+        if not all_items:
+            logger.warning("No raw data for %s. Run 'collect' first.", target_date)
+            return DailyOverview(date=target_date, summary="No data.", total_items=0), ""
+
+        # Rule-based filtering: dedup, score, rank, top-N
+        filtered_items = self.item_filter.filter(all_items)
+
+        return await self.overview_reporter.generate(
+            target_date, filtered_items, total_raw_count=len(all_items),
+        )
+
+    # --- Phase 3: Deep Dive (1 LLM call per selected item) ---
+
+    async def generate_deep_dive(
+        self, target_date: date, item_indices: list[int]
+    ) -> tuple[DeepDiveReport, str]:
+        """Generate Stage 2 deep dive report for selected items."""
+        logger.info("=== Phase 3: Deep dive for %s, items=%s ===", target_date, item_indices)
+
+        # Load the items index saved by overview reporter
+        items_index = self.store.load_json(
+            f"reports/{target_date.isoformat()}/items_index.json"
+        )
+        if not items_index:
+            logger.warning("No items_index found for %s. Run 'report' first.", target_date)
+            return DeepDiveReport(date=target_date, selected_items=item_indices), ""
+
+        return await self.deep_dive_reporter.generate(target_date, item_indices, items_index)
+
+    # --- Full Pipeline ---
+
+    async def run(self, target_date: date) -> Path:
+        """Execute full pipeline: collect → overview report."""
+        await self.collect(target_date)
+        overview, markdown = await self.generate_overview(target_date)
+        output_path = Path("output") / target_date.isoformat() / "daily_report.md"
+        logger.info("=== Pipeline complete. Report at %s ===", output_path)
+        return output_path
+
+    # --- Helpers ---
+
+    def _load_all_raw_items(self, target_date: date) -> list[SourceItem]:
+        """Load all raw items from all collectors for a date."""
         all_items: list[SourceItem] = []
         for source_name in self.collectors:
             raw_data = self.store.load_raw_items(target_date, source_name)
@@ -126,105 +177,7 @@ class DailyReportOrchestrator:
                         all_items.append(SourceItem.model_validate(item_data))
                     except Exception as e:
                         logger.debug("Skipping invalid item: %s", e)
-
-        if not all_items:
-            logger.warning("No raw data found for %s", target_date)
-            return []
-
-        # Classify items
-        papers = [i for i in all_items if i.source_type == SourceType.ARXIV_PAPER]
-        industry = [i for i in all_items if i.source_type == SourceType.RSS_ARTICLE
-                     and i.metadata.get("category") in ("industry", "news")]
-        social = [i for i in all_items if i.source_type in (SourceType.REDDIT_POST, SourceType.HACKER_NEWS)]
-        # Academic RSS goes with papers
-        academic_rss = [i for i in all_items if i.source_type == SourceType.RSS_ARTICLE
-                        and i.metadata.get("category") == "academic"]
-
-        logger.info(
-            "Classification: papers=%d, industry=%d, social=%d, academic_rss=%d",
-            len(papers), len(industry), len(social), len(academic_rss),
-        )
-
-        # Analyze each category with sequential indexing
-        all_analyzed: list[AnalyzedItem] = []
-        current_index = 1
-
-        if papers or academic_rss:
-            paper_items = papers + academic_rss
-            analyzed = await self.paper_analyzer.analyze(paper_items, start_index=current_index)
-            all_analyzed.extend(analyzed)
-            current_index += len(analyzed)
-
-        if industry:
-            analyzed = await self.industry_analyzer.analyze(industry, start_index=current_index)
-            all_analyzed.extend(analyzed)
-            current_index += len(analyzed)
-
-        if social:
-            analyzed = await self.social_analyzer.analyze(social, start_index=current_index)
-            all_analyzed.extend(analyzed)
-            current_index += len(analyzed)
-
-        # Save analyzed items
-        self.store.save_analyzed_items(target_date, all_analyzed)
-        logger.info("Analysis complete: %d items analyzed", len(all_analyzed))
-        return all_analyzed
-
-    # --- Phase 3: Overview Report ---
-
-    async def generate_overview(self, target_date: date) -> tuple[DailyOverview, str]:
-        """Generate Stage 1 overview report."""
-        logger.info("=== Phase 3: Generating overview report for %s ===", target_date)
-
-        # Load analyzed items
-        items = self._load_analyzed(target_date)
-        if not items:
-            logger.warning("No analyzed data for %s. Run 'analyze' first.", target_date)
-            return DailyOverview(date=target_date, summary="No data.", total_items=0), ""
-
-        return await self.overview_reporter.generate(target_date, items)
-
-    # --- Phase 4: Deep Dive ---
-
-    async def generate_deep_dive(
-        self, target_date: date, item_indices: list[int]
-    ) -> tuple[DeepDiveReport, str]:
-        """Generate Stage 2 deep dive report for selected items."""
-        logger.info("=== Phase 4: Generating deep dive for %s, items=%s ===", target_date, item_indices)
-
-        items = self._load_analyzed(target_date)
-        if not items:
-            logger.warning("No analyzed data for %s", target_date)
-            return DeepDiveReport(date=target_date, selected_items=item_indices), ""
-
-        return await self.deep_dive_reporter.generate(target_date, item_indices, items)
-
-    # --- Full Pipeline ---
-
-    async def run(self, target_date: date) -> Path:
-        """Execute full pipeline: collect → analyze → overview report."""
-        await self.collect(target_date)
-        await self.analyze(target_date)
-        overview, markdown = await self.generate_overview(target_date)
-        output_path = Path("output") / target_date.isoformat() / "daily_report.md"
-        logger.info("=== Pipeline complete. Report at %s ===", output_path)
-        return output_path
-
-    # --- Helpers ---
-
-    def _load_analyzed(self, target_date: date) -> list[AnalyzedItem]:
-        """Load analyzed items from storage."""
-        raw_data = self.store.load_analyzed_items(target_date)
-        if not raw_data:
-            return []
-
-        items = []
-        for item_data in raw_data:
-            try:
-                items.append(AnalyzedItem.model_validate(item_data))
-            except Exception as e:
-                logger.debug("Skipping invalid analyzed item: %s", e)
-        return items
+        return all_items
 
     def get_status(self) -> dict:
         """Get system status information."""
@@ -237,9 +190,13 @@ class DailyReportOrchestrator:
             "collectors": list(self.collectors.keys()),
             "config": {
                 "arxiv_categories": self.config.arxiv.categories,
-                "rss_feeds": len(self.config.rss.feeds),
-                "reddit_subreddits": self.config.reddit.subreddits,
                 "hn_min_score": self.config.hackernews.min_score,
+                "youtube_channels": len(self.config.youtube.channels),
+                "bilibili_users": len(self.config.bilibili.users),
+                "semantic_scholar_topics": self.config.semantic_scholar.topics,
+                "github_trending_languages": self.config.github_trending.languages,
+                "product_hunt_topics": self.config.product_hunt.topics,
+                "tavily_searches": len(self.config.tavily.searches),
             },
             "data": {
                 "raw_dates": [d.isoformat() for d in raw_dates],

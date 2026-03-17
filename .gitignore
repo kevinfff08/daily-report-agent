@@ -57,6 +57,7 @@ logs/
 
 # Claude
 .claude/
+CLAUDE.md
 
 # Trae
 .trae/

@@ -8,13 +8,17 @@ from src.models.source import SourceItem, SourceType
 class TestSourceType:
     def test_values(self):
         assert SourceType.ARXIV_PAPER == "arxiv_paper"
-        assert SourceType.RSS_ARTICLE == "rss_article"
-        assert SourceType.REDDIT_POST == "reddit_post"
         assert SourceType.HACKER_NEWS == "hacker_news"
+        assert SourceType.YOUTUBE_VIDEO == "youtube_video"
+        assert SourceType.BILIBILI_VIDEO == "bilibili_video"
+        assert SourceType.SEMANTIC_SCHOLAR == "semantic_scholar"
+        assert SourceType.GITHUB_TRENDING == "github_trending"
+        assert SourceType.PRODUCT_HUNT == "product_hunt"
+        assert SourceType.TAVILY_SEARCH == "tavily_search"
 
     def test_string_comparison(self):
         assert SourceType.ARXIV_PAPER == "arxiv_paper"
-        assert SourceType("rss_article") == SourceType.RSS_ARTICLE
+        assert SourceType("hacker_news") == SourceType.HACKER_NEWS
 
 
 class TestSourceItem:
@@ -43,12 +47,12 @@ class TestSourceItem:
     def test_source_name_fallback(self):
         item = SourceItem(
             id="test:1",
-            source_type=SourceType.REDDIT_POST,
+            source_type=SourceType.GITHUB_TRENDING,
             title="Test",
             url="https://example.com",
             published=datetime.now(tz=timezone.utc),
         )
-        assert item.source_name == "reddit_post"
+        assert item.source_name == "github_trending"
 
     def test_serialization_roundtrip(self, sample_arxiv_item):
         json_str = sample_arxiv_item.model_dump_json()
