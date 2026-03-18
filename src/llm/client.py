@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from anthropic import Anthropic
+from anthropic import Anthropic, APIStatusError
 
 from src.logging_config import get_logger
 from src.utils.json_repair import repair_json
@@ -13,6 +13,11 @@ from src.utils.json_repair import repair_json
 logger = get_logger("llm.client")
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts" / "v1"
+
+# Retry config for transient API errors (429, 529, 500, 502, 503)
+_MAX_RETRIES = 5
+_RETRY_BASE_DELAY = 2.0  # seconds
+_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 529}
 
 
 class LLMClient:
@@ -66,18 +71,33 @@ class LLMClient:
         if system:
             kwargs["system"] = system
 
-        response = self.client.messages.create(**kwargs)
-        text = response.content[0].text
+        last_err: Exception | None = None
+        for attempt in range(_MAX_RETRIES):
+            try:
+                response = self.client.messages.create(**kwargs)
+                text = response.content[0].text
 
-        latency = time.time() - t0
-        logger.debug(
-            "LLM response: latency=%.1fs, input=%d, output=%d, stop=%s",
-            latency,
-            response.usage.input_tokens,
-            response.usage.output_tokens,
-            response.stop_reason,
-        )
-        return text
+                latency = time.time() - t0
+                logger.debug(
+                    "LLM response: latency=%.1fs, input=%d, output=%d, stop=%s",
+                    latency,
+                    response.usage.input_tokens,
+                    response.usage.output_tokens,
+                    response.stop_reason,
+                )
+                return text
+            except APIStatusError as e:
+                if e.status_code not in _RETRYABLE_STATUS_CODES:
+                    raise
+                last_err = e
+                delay = _RETRY_BASE_DELAY * (2 ** attempt)
+                logger.warning(
+                    "LLM API error %d (attempt %d/%d), retrying in %.0fs: %s",
+                    e.status_code, attempt + 1, _MAX_RETRIES, delay, e.message,
+                )
+                time.sleep(delay)
+
+        raise last_err  # type: ignore[misc]
 
     def generate_json(
         self,
