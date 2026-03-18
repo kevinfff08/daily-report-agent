@@ -1,20 +1,41 @@
 """Stage 2: Deep dive report generator (5-10 min reading per item).
 
 Only analyzes the specific items the user selected from the overview.
+Content is enriched before analysis: papers get full PDF text, web items
+get full page content and supplementary search results.
 """
 
 from __future__ import annotations
 
-import json
 from datetime import date, datetime
 
+from src.enrichers import enrich_item
 from src.llm.client import LLMClient
 from src.logging_config import get_logger
-from src.models.report import DeepAnalysis, DeepDiveReport
-from src.models.source import SourceItem
+from src.models.report import DeepAnalysis, DeepDiveReport, DeepSection
+from src.models.source import SourceItem, SourceType
 from src.storage.local_store import LocalStore
 
 logger = get_logger("reporters.deep_dive")
+
+# Template selection by source type
+_PAPER_TYPES = {SourceType.ARXIV_PAPER, SourceType.SEMANTIC_SCHOLAR}
+_INDUSTRY_TYPES = {SourceType.TAVILY_SEARCH, SourceType.PRODUCT_HUNT}
+# Everything else (HN, YouTube, Bilibili, GitHub) → social template
+
+# Section headings per template (for parsing LLM output)
+_PAPER_HEADINGS = [
+    "研究背景与动机", "技术方法详解", "实验与结果分析",
+    "局限性与开放问题", "对研究社区的影响", "参考资料",
+]
+_INDUSTRY_HEADINGS = [
+    "产品/技术概述", "核心技术架构与实现", "竞争格局分析",
+    "应用场景与价值", "发展前景评估", "信息来源",
+]
+_SOCIAL_HEADINGS = [
+    "事件/项目概述", "技术实质分析", "社区反响与观点",
+    "实际应用价值", "趋势展望", "相关链接",
+]
 
 
 class DeepDiveReporter:
@@ -80,7 +101,7 @@ class DeepDiveReporter:
         ]
 
         for idx, item in selected:
-            analysis, md = self._analyze_single(idx, item)
+            analysis, md = await self._analyze_single(idx, item)
             analyses.append(analysis)
             markdown_parts.append(md)
 
@@ -103,52 +124,104 @@ class DeepDiveReporter:
         logger.info("Deep dive report saved to %s", output_path)
         return report, full_markdown
 
-    def _analyze_single(self, index: int, item: SourceItem) -> tuple[DeepAnalysis, str]:
-        """Generate deep analysis for a single item."""
-        logger.info("Deep diving into [%03d] %s", index, item.title)
+    async def _analyze_single(self, index: int, item: SourceItem) -> tuple[DeepAnalysis, str]:
+        """Generate deep analysis for a single item with enriched content."""
+        logger.info("Deep diving into [%03d] %s (%s)", index, item.title, item.source_type.value)
+
+        # Enrich content before LLM analysis
+        enriched_content = await enrich_item(item)
+        logger.info(
+            "Enriched content: %d chars for [%03d] %s",
+            len(enriched_content), index, item.title,
+        )
+
+        # Select template and headings based on source type
+        template_name, headings = self._select_template(item.source_type)
+
+        # Build template variables
+        variables: dict[str, str] = {
+            "title": item.title,
+            "source": item.source_name,
+            "url": item.url,
+            "content": enriched_content,
+        }
+        # Paper template also includes authors
+        if item.source_type in _PAPER_TYPES:
+            variables["authors"] = ", ".join(item.authors) if item.authors else "Unknown"
 
         markdown = self.llm.generate_with_template(
-            "deep_dive",
-            {
-                "title": item.title,
-                "source": item.source_name,
-                "url": item.url,
-                "original_analysis": "（首次深度分析，无先前分析）",
-                "content": item.content_snippet[:3000],
-            },
+            template_name,
+            variables,
             max_tokens=8192,
             temperature=0.3,
         )
 
-        # Parse sections from markdown (best-effort)
+        # Parse sections from markdown
+        sections = self._parse_sections(markdown, headings)
+
+        # Extract references from the last section
+        refs: list[str] = []
+        if sections and sections[-1].heading in ("参考资料", "信息来源", "相关链接"):
+            ref_section = sections.pop()
+            refs = [
+                line.strip().lstrip("- ").lstrip("* ")
+                for line in ref_section.content.split("\n")
+                if line.strip() and line.strip() != "-"
+            ]
+
         analysis = DeepAnalysis(
             index=index,
             title=item.title,
-            background_and_motivation=self._extract_section(markdown, "研究背景与动机", "技术方法详解"),
-            technical_deep_dive=self._extract_section(markdown, "技术方法详解", "实验分析"),
-            experimental_analysis=self._extract_section(markdown, "实验分析", "局限性与开放问题"),
-            limitations_and_open_questions=self._extract_section(markdown, "局限性与开放问题", "对研究社区的影响"),
-            community_impact=self._extract_section(markdown, "对研究社区的影响", "参考资料"),
-            references=[],
+            source_type=item.source_type.value,
+            sections=sections,
+            references=refs,
         )
 
         return analysis, markdown
 
     @staticmethod
-    def _extract_section(markdown: str, start_heading: str, end_heading: str) -> str:
-        """Extract content between two headings."""
+    def _select_template(source_type: SourceType) -> tuple[str, list[str]]:
+        """Select the appropriate prompt template based on source type."""
+        if source_type in _PAPER_TYPES:
+            return "deep_dive_paper", _PAPER_HEADINGS
+        if source_type in _INDUSTRY_TYPES:
+            return "deep_dive_industry", _INDUSTRY_HEADINGS
+        return "deep_dive_social", _SOCIAL_HEADINGS
+
+    @staticmethod
+    def _parse_sections(markdown: str, headings: list[str]) -> list[DeepSection]:
+        """Parse markdown into DeepSection objects based on expected headings."""
+        sections: list[DeepSection] = []
         lines = markdown.split("\n")
-        capturing = False
-        captured: list[str] = []
+        current_heading: str | None = None
+        current_lines: list[str] = []
 
         for line in lines:
+            # Check if this line is a heading (## or # with matching text)
             stripped = line.strip().lstrip("#").strip()
-            if start_heading in stripped:
-                capturing = True
-                continue
-            if end_heading in stripped and capturing:
-                break
-            if capturing:
-                captured.append(line)
+            matched_heading = None
+            for h in headings:
+                if h in stripped:
+                    matched_heading = h
+                    break
 
-        return "\n".join(captured).strip() or "Content not available."
+            if matched_heading is not None:
+                # Save previous section
+                if current_heading is not None:
+                    sections.append(DeepSection(
+                        heading=current_heading,
+                        content="\n".join(current_lines).strip(),
+                    ))
+                current_heading = matched_heading
+                current_lines = []
+            elif current_heading is not None:
+                current_lines.append(line)
+
+        # Save last section
+        if current_heading is not None:
+            sections.append(DeepSection(
+                heading=current_heading,
+                content="\n".join(current_lines).strip(),
+            ))
+
+        return sections

@@ -90,7 +90,7 @@ class TestCLI:
         assert result.exit_code == 0
 
     def test_deep_dive_no_data(self, mock_orchestrator):
-        mock_orchestrator.store.has_analyzed_data.return_value = False
+        mock_orchestrator.store.load_json.return_value = None
         with patch("src.cli._get_orchestrator", return_value=mock_orchestrator):
             result = runner.invoke(app, ["deep-dive", "--items", "1"])
 

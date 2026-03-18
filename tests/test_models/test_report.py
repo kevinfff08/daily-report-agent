@@ -6,6 +6,7 @@ from src.models.report import (
     DailyOverview,
     DeepAnalysis,
     DeepDiveReport,
+    DeepSection,
     IndexEntry,
     ReportSection,
 )
@@ -80,32 +81,38 @@ class TestDailyOverview:
         assert restored.summary == "Test"
 
 
+class TestDeepSection:
+    def test_create(self):
+        section = DeepSection(heading="研究背景与动机", content="Background text.")
+        assert section.heading == "研究背景与动机"
+        assert section.content == "Background text."
+
+
 class TestDeepAnalysis:
     def test_create(self):
         analysis = DeepAnalysis(
             index=1,
             title="Test Paper",
-            background_and_motivation="Background text here.",
-            technical_deep_dive="Technical details here.",
-            experimental_analysis="Experimental analysis here.",
-            limitations_and_open_questions="Limitations discussed.",
-            community_impact="Impact on community.",
+            source_type="arxiv_paper",
+            sections=[
+                DeepSection(heading="研究背景与动机", content="Background text here."),
+                DeepSection(heading="技术方法详解", content="Technical details here."),
+            ],
             references=["ref1", "ref2"],
         )
         assert analysis.index == 1
+        assert analysis.source_type == "arxiv_paper"
+        assert len(analysis.sections) == 2
         assert len(analysis.references) == 2
 
     def test_defaults(self):
         analysis = DeepAnalysis(
             index=1,
             title="Test",
-            background_and_motivation="",
-            technical_deep_dive="",
-            experimental_analysis="",
-            limitations_and_open_questions="",
-            community_impact="",
         )
+        assert analysis.sections == []
         assert analysis.references == []
+        assert analysis.source_type == ""
 
 
 class TestDeepDiveReport:
@@ -125,11 +132,11 @@ class TestDeepDiveReport:
                 DeepAnalysis(
                     index=1,
                     title="Paper 1",
-                    background_and_motivation="bg",
-                    technical_deep_dive="tech",
-                    experimental_analysis="exp",
-                    limitations_and_open_questions="lim",
-                    community_impact="impact",
+                    source_type="arxiv_paper",
+                    sections=[
+                        DeepSection(heading="研究背景与动机", content="bg"),
+                        DeepSection(heading="技术方法详解", content="tech"),
+                    ],
                 ),
             ],
         )
@@ -137,3 +144,4 @@ class TestDeepDiveReport:
         restored = DeepDiveReport.model_validate_json(json_str)
         assert len(restored.analyses) == 1
         assert restored.analyses[0].title == "Paper 1"
+        assert len(restored.analyses[0].sections) == 2

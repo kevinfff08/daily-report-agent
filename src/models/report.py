@@ -40,16 +40,20 @@ class DailyOverview(BaseModel):
     generation_time: datetime = Field(default_factory=datetime.now)
 
 
+class DeepSection(BaseModel):
+    """A single section of a deep analysis."""
+
+    heading: str = Field(description="Section heading")
+    content: str = Field(description="Section content")
+
+
 class DeepAnalysis(BaseModel):
     """Deep analysis of a single selected item (Stage 2)."""
 
     index: int
     title: str
-    background_and_motivation: str = Field(description="300-500 words")
-    technical_deep_dive: str = Field(description="500-1000 words")
-    experimental_analysis: str = Field(description="300-500 words")
-    limitations_and_open_questions: str = Field(description="200-300 words")
-    community_impact: str = Field(description="200-300 words")
+    source_type: str = Field(default="", description="Source type for template selection")
+    sections: list[DeepSection] = Field(default_factory=list)
     references: list[str] = Field(default_factory=list)
 
 
