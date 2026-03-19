@@ -11,7 +11,8 @@ PhD-level 每日情报聚合工具，监控 arXiv 论文、大厂官方博客、
   - **开源项目**：GitHub Trending
   - **新产品**：Product Hunt GraphQL API
   - **社区热点**：Hacker News Firebase API
-- **Claude LLM 驱动分析**：批量结构化分析（论文/业界/社区三类分析器）
+- **LLM 驱动分析（Anthropic / OpenAI 适配）**：批量结构化分析（论文/业界/社区三类分析器）
+- **公式渲染兼容**：报告生成时自动将 `\(...\)` / `\[...\]` 规范为 `$...$` / `$$...$$`，便于主流 Markdown/LaTeX 渲染链路编译
 - **两阶段报告系统**：
   - **Stage 1 概览报告**（~15 分钟阅读）：全量覆盖，带编号索引，PhD-level 信息密度
   - **Stage 2 深度分析**（30-60 分钟阅读）：用户选择感兴趣的编号，生成深入分析
@@ -50,8 +51,17 @@ cp .env.example .env
 编辑 `.env`，填入 API Keys：
 
 ```
-# 必需
-ANTHROPIC_API_KEY=sk-ant-...    # Claude LLM 调用
+# LLM 配置
+LLM_PROVIDER=anthropic           # anthropic | openai
+LLM_MODE=api-key
+
+# 当 LLM_PROVIDER=anthropic 时必需
+ANTHROPIC_API_KEY=sk-ant-...     # Anthropic API Key
+
+# 当 LLM_PROVIDER=openai 时必需
+# OPENAI_API_KEY=sk-proj-...     # OpenAI API Key
+
+# 数据源 API Keys（必需）
 YOUTUBE_API_KEY=AIza...          # YouTube 视频采集
 TAVILY_API_KEY=tvly-...          # 大厂博客搜索
 PRODUCT_HUNT_TOKEN=...           # Product Hunt 新产品
@@ -134,7 +144,7 @@ DailyReport/
 │   │   └── tavily_collector.py          # Tavily Search (大厂博客)
 │   ├── analyzers/                # LLM 分析层（论文/业界/社区）
 │   ├── reporters/                # 报告生成层（概览/深度）
-│   ├── llm/                      # Claude API 封装 + Prompt 模板
+│   ├── llm/                      # LLM API 封装（Anthropic/OpenAI） + Prompt 模板
 │   └── storage/                  # JSON 文件持久化
 ├── config/
 │   ├── sources.yaml              # 数据源配置
@@ -169,9 +179,12 @@ python -m pytest tests/ -v
 
 ### LLM 代理模式
 
-如果使用代理服务器访问 Claude API：
+如果使用代理服务器（setup-token 模式）：
 
 ```
+LLM_PROVIDER=anthropic  # 或 openai
 LLM_MODE=setup-token
 LLM_PROXY_URL=http://localhost:8317
 ```
+
+当 `LLM_PROVIDER=openai` 时，程序会自动将 `LLM_PROXY_URL` 规范为 `.../v1`（例如 `http://localhost:8317` -> `http://localhost:8317/v1`）。

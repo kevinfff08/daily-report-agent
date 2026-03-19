@@ -42,14 +42,16 @@ class DailyReportOrchestrator:
         self,
         data_dir: str = "data",
         config_dir: str = "config",
+        llm_provider: str = "anthropic",
         api_key: str | None = None,
         llm_model: str | None = None,
         base_url: str | None = None,
     ):
         self.store = LocalStore(data_dir)
         self.llm = LLMClient(
+            provider=llm_provider,
             api_key=api_key,
-            model=llm_model or "claude-sonnet-4-20250514",
+            model=llm_model,
             base_url=base_url,
         )
         self.config = self._load_config(config_dir)
@@ -186,6 +188,7 @@ class DailyReportOrchestrator:
         report_dates = self.store.list_dates("reports")
 
         return {
+            "llm_provider": self.llm.provider,
             "llm_model": self.llm.model,
             "collectors": list(self.collectors.keys()),
             "config": {

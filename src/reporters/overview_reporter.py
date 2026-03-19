@@ -14,6 +14,7 @@ from src.logging_config import get_logger
 from src.models.report import DailyOverview, IndexEntry, ReportSection
 from src.models.source import SourceItem, SourceType
 from src.storage.local_store import LocalStore
+from src.utils.markdown_math import normalize_markdown_math
 
 logger = get_logger("reporters.overview")
 
@@ -225,4 +226,4 @@ class OverviewReporter:
             temperature=0.3,
         )
 
-        return markdown
+        return normalize_markdown_math(markdown)

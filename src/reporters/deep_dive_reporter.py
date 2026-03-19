@@ -15,6 +15,7 @@ from src.logging_config import get_logger
 from src.models.report import DeepAnalysis, DeepDiveReport, DeepSection
 from src.models.source import SourceItem, SourceType
 from src.storage.local_store import LocalStore
+from src.utils.markdown_math import normalize_markdown_math
 
 logger = get_logger("reporters.deep_dive")
 
@@ -155,6 +156,7 @@ class DeepDiveReporter:
             max_tokens=8192,
             temperature=0.3,
         )
+        markdown = normalize_markdown_math(markdown)
 
         # Parse sections from markdown
         sections = self._parse_sections(markdown, headings)

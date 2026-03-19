@@ -28,6 +28,7 @@ def mock_orchestrator():
     ))
     orch.run = AsyncMock(return_value=Path("output/2026-03-10/daily_report.md"))
     orch.get_status.return_value = {
+        "llm_provider": "anthropic",
         "llm_model": "test-model",
         "collectors": ["arxiv", "hackernews", "youtube", "bilibili",
                         "semantic_scholar", "github_trending", "product_hunt", "tavily"],
@@ -51,6 +52,34 @@ def mock_orchestrator():
 
 
 class TestCLI:
+    def test_get_orchestrator_uses_openai_key(self, monkeypatch):
+        monkeypatch.setenv("LLM_PROVIDER", "openai")
+        monkeypatch.setenv("OPENAI_API_KEY", "openai-test-key")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-should-not-be-used")
+
+        with patch("src.orchestrator.DailyReportOrchestrator") as mock_orch_cls:
+            mock_orch_cls.return_value = MagicMock()
+            from src.cli import _get_orchestrator
+            _ = _get_orchestrator()
+
+            kwargs = mock_orch_cls.call_args.kwargs
+            assert kwargs["llm_provider"] == "openai"
+            assert kwargs["api_key"] == "openai-test-key"
+
+    def test_get_orchestrator_defaults_to_anthropic(self, monkeypatch):
+        monkeypatch.delenv("LLM_PROVIDER", raising=False)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-test-key")
+        monkeypatch.setenv("OPENAI_API_KEY", "openai-should-not-be-used")
+
+        with patch("src.orchestrator.DailyReportOrchestrator") as mock_orch_cls:
+            mock_orch_cls.return_value = MagicMock()
+            from src.cli import _get_orchestrator
+            _ = _get_orchestrator()
+
+            kwargs = mock_orch_cls.call_args.kwargs
+            assert kwargs["llm_provider"] == "anthropic"
+            assert kwargs["api_key"] == "anthropic-test-key"
+
     def test_help(self):
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0

@@ -16,19 +16,25 @@ if not exist "%~dp0.env" (
     exit /b 1
 )
 
-REM --- Read LLM_MODE from .env ---
+REM --- Read LLM config from .env ---
+set LLM_PROVIDER=anthropic
 set LLM_MODE=api-key
 for /f "usebackq tokens=1,* delims==" %%A in ("%~dp0.env") do (
     set "key=%%A"
     echo !key! | findstr /b "#" >nul && (
         REM skip comment lines
     ) || (
+        if "%%A"=="LLM_PROVIDER" set "LLM_PROVIDER=%%B"
         if "%%A"=="LLM_MODE" set "LLM_MODE=%%B"
     )
 )
 
+set ACTIVE_LLM_KEY=ANTHROPIC_API_KEY
+if /I "%LLM_PROVIDER%"=="openai" set "ACTIVE_LLM_KEY=OPENAI_API_KEY"
+
 echo ============================================
 echo   DailyReport - Daily Intelligence System
+echo   LLM Provider: %LLM_PROVIDER%
 echo   LLM Mode: %LLM_MODE%
 echo ============================================
 echo.
@@ -58,7 +64,7 @@ if "%LLM_MODE%"=="setup-token" (
     echo [OK] CLIProxyAPI proxy started.
     echo.
 ) else (
-    echo [PROXY] Skipping proxy (api-key mode, using ANTHROPIC_API_KEY directly)
+    echo [PROXY] Skipping proxy (api-key mode, using %ACTIVE_LLM_KEY% directly)
     echo.
 )
 

@@ -30,8 +30,12 @@ def _get_orchestrator() -> "DailyReportOrchestrator":
     """Create the orchestrator from environment config."""
     from src.orchestrator import DailyReportOrchestrator
 
+    llm_provider = os.environ.get("LLM_PROVIDER", "anthropic").lower()
     llm_mode = os.environ.get("LLM_MODE", "api-key")
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if llm_provider == "openai":
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+    else:
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     base_url = None
     if llm_mode == "setup-token":
         base_url = os.environ.get("LLM_PROXY_URL", "http://localhost:8317")
@@ -39,6 +43,7 @@ def _get_orchestrator() -> "DailyReportOrchestrator":
     return DailyReportOrchestrator(
         data_dir=os.environ.get("DATA_DIR", "data"),
         config_dir=os.environ.get("CONFIG_DIR", "config"),
+        llm_provider=llm_provider,
         api_key=api_key,
         llm_model=os.environ.get("LLM_MODEL"),
         base_url=base_url,
@@ -160,6 +165,7 @@ def status() -> None:
     config_table = Table(title="Configuration")
     config_table.add_column("Setting", style="cyan")
     config_table.add_column("Value", style="white")
+    config_table.add_row("LLM Provider", info["llm_provider"])
     config_table.add_row("LLM Model", info["llm_model"])
     config_table.add_row("Collectors", ", ".join(info["collectors"]))
     config_table.add_row("arXiv Categories", ", ".join(info["config"]["arxiv_categories"]))

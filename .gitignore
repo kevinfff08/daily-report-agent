@@ -59,6 +59,9 @@ logs/
 .claude/
 CLAUDE.md
 
+# OpenAI
+AGENTS.md
+
 # Trae
 .trae/
 
