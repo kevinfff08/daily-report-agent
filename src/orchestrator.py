@@ -24,6 +24,7 @@ from src.logging_config import get_logger
 from src.models.config import SourceConfig
 from src.models.report import DailyOverview, DeepDiveReport
 from src.models.source import SourceItem
+from src.registry import DeepDiveRegistryManager
 from src.reporters import DeepDiveReporter, OverviewReporter
 from src.storage.local_store import LocalStore
 
@@ -46,6 +47,7 @@ class DailyReportOrchestrator:
         api_key: str | None = None,
         llm_model: str | None = None,
         base_url: str | None = None,
+        registry_manager: DeepDiveRegistryManager | None = None,
     ):
         self.store = LocalStore(data_dir)
         self.llm = LLMClient(
@@ -72,6 +74,10 @@ class DailyReportOrchestrator:
         self.item_filter = ItemFilter()
         self.overview_reporter = OverviewReporter(self.llm, self.store)
         self.deep_dive_reporter = DeepDiveReporter(self.llm, self.store)
+        self.registry_manager = registry_manager or DeepDiveRegistryManager(
+            self.llm,
+            local_store=self.store,
+        )
 
         logger.info("Orchestrator initialized (model=%s)", self.llm.model)
 
@@ -154,7 +160,15 @@ class DailyReportOrchestrator:
             logger.warning("No items_index found for %s. Run 'report' first.", target_date)
             return DeepDiveReport(date=target_date, selected_items=item_indices), ""
 
-        return await self.deep_dive_reporter.generate(target_date, item_indices, items_index)
+        report, markdown = await self.deep_dive_reporter.generate(target_date, item_indices, items_index)
+        if report.analyses:
+            try:
+                registered = self.registry_manager.register_from_deep_dive(target_date, report, items_index)
+                logger.info("Registered %d deep-dive items into the long-term registry", registered)
+            except Exception as exc:
+                logger.warning("Deep-dive registry update failed: %s", exc)
+
+        return report, markdown
 
     # --- Full Pipeline ---
 

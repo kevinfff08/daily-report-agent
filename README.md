@@ -1,190 +1,245 @@
-# DailyReport — 每日 AI/ML 情报聚合系统
+﻿# DailyReport — 每日 AI/ML 情报聚合系统
 
-PhD-level 每日情报聚合工具，监控 arXiv 论文、大厂官方博客、视频博主、开源项目、新产品发布、社区动态，生成两阶段深度报告。
+PhD-level 每日情报工具，监控 arXiv、顶会/Blog、社区讨论、开源项目和新产品发布，生成两阶段报告：
+- Stage 1：`daily_report.md`，适合 10-15 分钟快速浏览
+- Stage 2：`deep_dive_report.md`，针对你手选条目的深度分析
 
-## 功能特性
+## 功能概览
 
-- **8 源数据采集**：
-  - **学术论文**：arXiv API + Semantic Scholar API
-  - **大厂博客**：Tavily Search 定向搜索（OpenAI、Anthropic、Google DeepMind、Meta、Microsoft、NVIDIA 等 10 家）
-  - **视频博主**：YouTube Data API + Bilibili API
-  - **开源项目**：GitHub Trending
-  - **新产品**：Product Hunt GraphQL API
-  - **社区热点**：Hacker News Firebase API
-- **LLM 驱动分析（Anthropic / OpenAI 适配）**：批量结构化分析（论文/业界/社区三类分析器）
-- **公式渲染兼容**：报告生成时自动将 `\(...\)` / `\[...\]` 规范为 `$...$` / `$$...$$`，便于主流 Markdown/LaTeX 渲染链路编译
-- **两阶段报告系统**：
-  - **Stage 1 概览报告**（~15 分钟阅读）：全量覆盖，带编号索引，PhD-level 信息密度
-  - **Stage 2 深度分析**（30-60 分钟阅读）：用户选择感兴趣的编号，生成深入分析
-- **全量索引**：不做智能过滤，所有条目编号列出，用户自主选择深入方向
-- **手动触发**：无定时调度，按需执行
+- 8 个数据源：arXiv、Semantic Scholar、Tavily、Product Hunt、Hacker News、YouTube、Bilibili、GitHub Trending
+- 两阶段报告流程：先总览，再按编号深挖
+- OpenAI / Anthropic 双适配，支持 API Key 和 CLIProxy 转接
+- Markdown 数学公式规范化，便于后续 LaTeX / PDF 链路使用
+- 深度分析完成后自动登记到长期台账
+- 长期台账支持命令行展示、状态维护和历史条目检索
 
 ## 环境准备
 
 ### 前置条件
 
-- Python 3.12+
-- Conda（推荐使用 `research_tools` 环境）
-- API Keys（见下方配置部分）
+- Python 3.14+
+- Conda 环境：`research_tools`
+- 必要 API Key：见下方配置说明
 
-### 安装依赖
+### 安装
 
 ```bash
 conda activate research_tools
 pip install -e .
 ```
 
-开发环境（含测试依赖）：
+开发环境：
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-### 配置
+## 配置
 
-1. **环境变量**：复制并编辑 `.env` 文件
+### `.env`
+
+复制示例：
 
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env`，填入 API Keys：
+常用配置：
 
-```
-# LLM 配置
-LLM_PROVIDER=anthropic           # anthropic | openai
-LLM_MODE=api-key
+```env
+# LLM
+LLM_PROVIDER=anthropic          # anthropic | openai
+LLM_MODE=api-key                # api-key | setup-token
+ANTHROPIC_API_KEY=sk-ant-...
+# OPENAI_API_KEY=sk-proj-...
+# LLM_PROXY_URL=http://localhost:8317
+# LLM_MODEL=gpt-4.1-mini
 
-# 当 LLM_PROVIDER=anthropic 时必需
-ANTHROPIC_API_KEY=sk-ant-...     # Anthropic API Key
-
-# 当 LLM_PROVIDER=openai 时必需
-# OPENAI_API_KEY=sk-proj-...     # OpenAI API Key
-
-# 数据源 API Keys（必需）
-YOUTUBE_API_KEY=AIza...          # YouTube 视频采集
-TAVILY_API_KEY=tvly-...          # 大厂博客搜索
-PRODUCT_HUNT_TOKEN=...           # Product Hunt 新产品
-
-# 可选
-SEMANTIC_SCHOLAR_API_KEY=        # 提高 Semantic Scholar 速率限制
-GITHUB_TOKEN=ghp_...             # 提高 GitHub 速率限制
+# Data source keys
+YOUTUBE_API_KEY=AIza...
+TAVILY_API_KEY=tvly-...
+PRODUCT_HUNT_TOKEN=...
+# Optional
+SEMANTIC_SCHOLAR_API_KEY=
+GITHUB_TOKEN=
 ```
 
-2. **数据源配置**：复制并编辑 `config/sources.yaml`
+当使用 CLIProxy 时：
+
+```env
+LLM_PROVIDER=openai             # 或 anthropic
+LLM_MODE=setup-token
+LLM_PROXY_URL=http://localhost:8317
+```
+
+OpenAI 适配会自动把 `LLM_PROXY_URL` 规范到 `/v1`，例如 `http://localhost:8317` 会自动变成 `http://localhost:8317/v1`。
+
+### `config/sources.yaml`
+
+复制示例：
 
 ```bash
 cp config/sources.example.yaml config/sources.yaml
 ```
 
-按需调整各数据源参数：YouTube 频道、Bilibili UP主、arXiv 类别、搜索关键词等。
+按需调整 YouTube 频道、Bilibili UP 主、arXiv 分类、Tavily 搜索项等数据源参数。
 
-## 使用方法
-
-### 快速启动（Windows）
-
-双击 `start.bat`，会自动激活 conda 环境并显示帮助信息。
-
-### CLI 命令
+## 常用命令
 
 ```bash
 # 查看帮助
 python -m src.cli --help
 
-# 查看系统状态和配置
+# 系统状态
 python -m src.cli status
 
-# 采集今日数据（所有数据源）
+# 只采集
 python -m src.cli collect
+python -m src.cli collect --date 2026-03-25 --sources arxiv,hackernews,tavily
 
-# 采集指定日期、指定数据源
-python -m src.cli collect --date 2026-03-10 --sources arxiv,hackernews,youtube
-
-# 生成 Stage 1 概览报告（自动补全缺失的采集/分析步骤）
+# 生成 Stage 1 概览报告
 python -m src.cli report
+python -m src.cli report --date 2026-03-25
 
-# 全流程一键执行（采集 + 分析 + 概览报告）
+# 一键跑完整流程（collect + overview）
 python -m src.cli run
 
-# 根据概览报告中的编号，生成 Stage 2 深度分析
-python -m src.cli deep-dive --items "1,3,15,23"
+# 生成 Stage 2 深度分析
+python -m src.cli deep-dive --items "1,3,15"
+python -m src.cli deep-dive --date 2026-03-25 --items "1,3,15"
 ```
 
-### 典型工作流
+## 长期台账
+
+### 文件组织
+
+- 实际台账按月存储：`records/YYYY-MM-record.md`
+- 示例文件：`records/2026-03-record.example.md`
+- 实际台账被 `.gitignore` 忽略，示例文件保留在仓库中用于公开展示格式
+
+### 台账结构
+
+主表列：
+- `日期`
+- `记录ID`
+- `标题`
+- `关键词`
+- `属性`
+- `摘要`
+- `我的关注状态`
+
+说明：
+- `记录ID` 固定为 `YYYYMMDD-XXX`
+- `摘要` 列只保存稳定引用号，例如 `SUM-20260325-001`
+- 完整摘要放在同一月文件下半部分的“摘要附录”中
+- 自动同步只覆盖自动字段：标题、关键词、属性、摘要
+- 你的手动字段 `我的关注状态` 会被保留
+
+关注状态含义：
+- `*`：非常关注
+- `?`：需要进一步学习
+- `✓`：可能有用
+
+### 台账命令
 
 ```bash
-# 1. 采集 + 生成概览报告
+# 查看全部历史记录
+python -m src.cli registry show
+
+# 查看指定月份
+python -m src.cli registry show --month 2026-03
+
+# 按状态过滤
+python -m src.cli registry show --status star
+
+# 更新关注状态
+python -m src.cli registry mark --id 20260325-001 --status star
+python -m src.cli registry mark --id 20260325-001 --status question
+python -m src.cli registry mark --id 20260325-001 --status check
+python -m src.cli registry mark --id 20260325-001 --status none
+
+# 检索最接近的历史条目
+python -m src.cli registry find --query "multi-agent safety"
+python -m src.cli registry find --query "agent workflow IDE" --limit 5
+```
+
+### `registry find` 的检索顺序
+
+1. 先在 `关键词` 字段里做纯代码匹配
+2. 若 0 命中，再在 `摘要` 正文里做纯代码匹配
+3. 若仍 0 命中，再把查询和全部月度记录交给 LLM 做最终相关性判断
+
+CLI 输出固定显示：`文件名`、`日期`、`记录ID`、`标题`。
+
+## 数据产物
+
+```text
+data/
+  raw/YYYY-MM-DD/                # 原始采集结果
+  analyzed/YYYY-MM-DD/           # 分析结果
+  reports/YYYY-MM-DD/
+    overview.md                  # Stage 1 markdown
+    overview_model.json          # Stage 1 结构化结果
+    items_index.json             # 候选条目索引
+    overview_snippets.json       # 已入选条目的简版摘要
+    deep_dive.md                 # Stage 2 markdown 数据
+
+output/
+  YYYY-MM-DD/
+    daily_report.md              # 最终概览报告
+    deep_dive_report.md          # 最终深度分析报告
+
+records/
+  YYYY-MM-record.md              # 月度长期台账（gitignored）
+  2026-03-record.example.md      # 公开示例
+```
+
+## 典型工作流
+
+```bash
+# 1. 跑当日概览
 python -m src.cli run
 
-# 2. 阅读 output/YYYY-MM-DD/daily_report.md，选出感兴趣的编号
+# 2. 阅读 output/YYYY-MM-DD/daily_report.md，挑选编号
 
 # 3. 生成深度分析
 python -m src.cli deep-dive --items "1,5,12"
 
-# 4. 阅读 output/YYYY-MM-DD/deep_dive_report.md
+# 4. 深度分析完成后，条目会自动登记到当月 records/YYYY-MM-record.md
+
+# 5. 后续阅读完可更新关注状态
+python -m src.cli registry mark --id 20260325-001 --status star
 ```
 
-## 项目结构
-
-```
-DailyReport/
-├── src/
-│   ├── cli.py                    # Typer CLI 入口（5 个命令）
-│   ├── orchestrator.py           # 核心调度器
-│   ├── logging_config.py         # 集中式日志
-│   ├── models/                   # Pydantic v2 数据模型
-│   ├── collectors/               # 8 个数据采集器
-│   │   ├── arxiv_collector.py           # arXiv Atom API
-│   │   ├── hacker_news_collector.py     # HN Firebase API
-│   │   ├── youtube_collector.py         # YouTube Data API v3
-│   │   ├── bilibili_collector.py        # Bilibili API (WBI signed)
-│   │   ├── semantic_scholar_collector.py # Semantic Scholar API
-│   │   ├── github_trending_collector.py  # GitHub Trending HTML
-│   │   ├── product_hunt_collector.py    # Product Hunt GraphQL
-│   │   └── tavily_collector.py          # Tavily Search (大厂博客)
-│   ├── analyzers/                # LLM 分析层（论文/业界/社区）
-│   ├── reporters/                # 报告生成层（概览/深度）
-│   ├── llm/                      # LLM API 封装（Anthropic/OpenAI） + Prompt 模板
-│   └── storage/                  # JSON 文件持久化
-├── config/
-│   ├── sources.yaml              # 数据源配置
-│   └── sources.example.yaml      # 配置示例
-├── data/                         # 运行时数据（gitignored）
-├── output/                       # 最终报告（gitignored）
-├── logs/                         # 日志文件（gitignored）
-└── tests/                        # 134 个测试
-```
-
-## 分析器路由
-
-| 来源类型 | 分析器 | 输出类别 |
-|---------|--------|---------|
-| arXiv, Semantic Scholar | PaperAnalyzer | 论文 |
-| Tavily Search, Product Hunt | IndustryAnalyzer | 业界动态 |
-| Hacker News, YouTube, Bilibili, GitHub Trending | SocialAnalyzer | 社区热点 |
-
-## 开发
-
-### 运行测试
+## 开发与测试
 
 ```bash
 conda activate research_tools
 python -m pytest tests/ -v
 ```
 
-### 日志
+日志：
+- 文件日志：`logs/YYYY-MM-DD.log`
+- 控制台：`WARNING+`
 
-- 日志文件：`logs/YYYY-MM-DD.log`（DEBUG 级别）
-- 控制台输出：WARNING+ 级别
+## 项目结构
 
-### LLM 代理模式
-
-如果使用代理服务器（setup-token 模式）：
-
+```text
+src/
+  cli.py
+  orchestrator.py
+  llm/
+  collectors/
+  analyzers/
+  reporters/
+  registry/
+  models/
+  storage/
+  utils/
 ```
-LLM_PROVIDER=anthropic  # 或 openai
-LLM_MODE=setup-token
-LLM_PROXY_URL=http://localhost:8317
-```
 
-当 `LLM_PROVIDER=openai` 时，程序会自动将 `LLM_PROXY_URL` 规范为 `.../v1`（例如 `http://localhost:8317` -> `http://localhost:8317/v1`）。
+其中：
+- `reporters/overview_reporter.py` 负责生成 `daily_report.md` 和 `overview_snippets.json`
+- `reporters/deep_dive_reporter.py` 负责生成 `deep_dive_report.md`
+- `registry/manager.py` 负责深度分析登记和历史条目检索
+- `storage/registry_store.py` 负责月度 Markdown 台账的确定性读写

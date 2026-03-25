@@ -1,4 +1,4 @@
-"""CLI entry point for DailyReport using Typer."""
+﻿"""CLI entry point for DailyReport using Typer."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from src.logging_config import get_logger, setup_logging
+from src.models.registry import InterestStatus
+from src.storage.registry_store import RegistryStore
 
 load_dotenv()
 setup_logging()
@@ -24,6 +26,18 @@ app = typer.Typer(
     help="Daily intelligence aggregation for AI/ML research.",
     no_args_is_help=True,
 )
+registry_app = typer.Typer(
+    name="registry",
+    help="维护 deep-dive 长期关注台账。",
+)
+app.add_typer(registry_app, name="registry")
+
+_STATUS_OPTION_TO_SYMBOL = {
+    "none": InterestStatus.NONE,
+    "star": InterestStatus.STAR,
+    "question": InterestStatus.QUESTION,
+    "check": InterestStatus.CHECK,
+}
 
 
 def _get_orchestrator() -> "DailyReportOrchestrator":
@@ -55,6 +69,16 @@ def _parse_date(date_str: str | None) -> date:
     if date_str:
         return date.fromisoformat(date_str)
     return date.today()
+
+
+def _get_registry_store() -> RegistryStore:
+    """Create the registry store."""
+    return RegistryStore()
+
+
+def _get_registry_manager() -> "DeepDiveRegistryManager":
+    """Create the registry manager with the configured LLM."""
+    return _get_orchestrator().registry_manager
 
 
 @app.command()
@@ -90,13 +114,11 @@ def report(
     console.print(Panel(f"[bold]Generating overview report for {d}[/bold]", style="blue"))
 
     orch = _get_orchestrator()
-
-    # Check if we have raw data, if not collect first
     if not orch.store.has_raw_data(d):
         console.print("[yellow]No raw data found. Collecting first...[/yellow]")
         asyncio.run(orch.collect(d))
 
-    overview, markdown = asyncio.run(orch.generate_overview(d))
+    overview, _ = asyncio.run(orch.generate_overview(d))
     console.print(f"\n[bold green]Report generated: {overview.total_items} items[/bold green]")
     console.print(f"Output: output/{d.isoformat()}/daily_report.md")
 
@@ -108,33 +130,24 @@ def deep_dive(
 ) -> None:
     """Generate Stage 2 deep dive report for selected items."""
     d = _parse_date(target_date)
-
-    # Parse indices
-    indices = []
-    for s in items.split(","):
-        s = s.strip()
+    indices: list[int] = []
+    for raw in items.split(","):
+        value = raw.strip()
         try:
-            indices.append(int(s))
+            indices.append(int(value))
         except ValueError:
-            console.print(f"[red]Invalid index: {s}[/red]")
+            console.print(f"[red]Invalid index: {value}[/red]")
             raise typer.Exit(1)
 
-    console.print(Panel(
-        f"[bold]Deep dive for {d}: items {indices}[/bold]",
-        style="blue",
-    ))
+    console.print(Panel(f"[bold]Deep dive for {d}: items {indices}[/bold]", style="blue"))
 
     orch = _get_orchestrator()
-
-    # Check for items_index (created by overview report)
-    items_index = orch.store.load_json(
-        f"reports/{d.isoformat()}/items_index.json"
-    )
+    items_index = orch.store.load_json(f"reports/{d.isoformat()}/items_index.json")
     if not items_index:
         console.print("[red]No items index found. Run 'report' first to generate the overview.[/red]")
         raise typer.Exit(1)
 
-    report_model, markdown = asyncio.run(orch.generate_deep_dive(d, indices))
+    report_model, _ = asyncio.run(orch.generate_deep_dive(d, indices))
     console.print(f"\n[bold green]Deep dive complete: {len(report_model.analyses)} analyses[/bold green]")
     console.print(f"Output: output/{d.isoformat()}/deep_dive_report.md")
 
@@ -149,7 +162,7 @@ def run(
 
     orch = _get_orchestrator()
     output_path = asyncio.run(orch.run(d))
-    console.print(f"\n[bold green]Pipeline complete![/bold green]")
+    console.print("\n[bold green]Pipeline complete![/bold green]")
     console.print(f"Report: {output_path}")
 
 
@@ -161,7 +174,6 @@ def status() -> None:
 
     console.print(Panel("[bold]DailyReport System Status[/bold]", style="blue"))
 
-    # Config
     config_table = Table(title="Configuration")
     config_table.add_column("Setting", style="cyan")
     config_table.add_column("Value", style="white")
@@ -178,7 +190,6 @@ def status() -> None:
     config_table.add_row("Tavily Searches", str(info["config"]["tavily_searches"]))
     console.print(config_table)
 
-    # Data
     data_table = Table(title="Available Data")
     data_table.add_column("Layer", style="cyan")
     data_table.add_column("Dates", style="white")
@@ -186,6 +197,107 @@ def status() -> None:
     data_table.add_row("Analyzed", ", ".join(info["data"]["analyzed_dates"]) or "(none)")
     data_table.add_row("Reports", ", ".join(info["data"]["report_dates"]) or "(none)")
     console.print(data_table)
+
+
+@registry_app.command("show")
+def registry_show(
+    month: str = typer.Option(None, "--month", help="仅显示指定月份的记录 (YYYY-MM)"),
+    status: str = typer.Option(None, "--status", "-s", help="过滤状态: star, question, check, none"),
+    limit: int = typer.Option(50, "--limit", "-n", min=1, help="最多显示多少条记录"),
+) -> None:
+    """Show registry entries in a readable table."""
+    store = _get_registry_store()
+    entries = store.load_month_entries(month) if month else store.load_all_entries()
+
+    if status:
+        normalized = status.strip().lower()
+        if normalized not in _STATUS_OPTION_TO_SYMBOL:
+            console.print(f"[red]Invalid status: {status}[/red]")
+            raise typer.Exit(1)
+        wanted_status = _STATUS_OPTION_TO_SYMBOL[normalized]
+        entries = [entry for entry in entries if entry.interest_status == wanted_status]
+
+    entries = entries[:limit]
+    if not entries:
+        console.print("[yellow]台账为空，或没有符合筛选条件的记录。[/yellow]")
+        return
+
+    table = Table(title="Deep Dive 长期关注台账")
+    table.add_column("日期", style="cyan")
+    table.add_column("记录ID", style="white")
+    table.add_column("标题", style="green")
+    table.add_column("关键词", style="magenta")
+    table.add_column("属性", style="yellow")
+    table.add_column("摘要", style="blue")
+    table.add_column("状态", style="white")
+
+    for entry in entries:
+        table.add_row(
+            entry.date.isoformat(),
+            entry.record_id,
+            entry.title,
+            " / ".join(entry.keywords),
+            entry.attribute.value,
+            entry.summary_ref,
+            entry.interest_status.value,
+        )
+
+    console.print(table)
+
+
+@registry_app.command("mark")
+def registry_mark(
+    record_id: str = typer.Option(..., "--id", help="记录ID，例如 20260325-001"),
+    status: str = typer.Option(..., "--status", "-s", help="目标状态: star, question, check, none"),
+) -> None:
+    """Update the interest status for a registry item."""
+    normalized = status.strip().lower()
+    if normalized not in _STATUS_OPTION_TO_SYMBOL:
+        console.print(f"[red]Invalid status: {status}[/red]")
+        raise typer.Exit(1)
+
+    store = _get_registry_store()
+    try:
+        entry = store.update_interest_status(record_id, _STATUS_OPTION_TO_SYMBOL[normalized])
+    except KeyError:
+        console.print(f"[red]未找到记录 {record_id}[/red]")
+        raise typer.Exit(1)
+
+    display_status = entry.interest_status.value or "(空)"
+    console.print(f"[bold green]已更新[/bold green] {record_id} -> {display_status}")
+
+
+@registry_app.command("find")
+def registry_find(
+    query: str = typer.Option(..., "--query", "-q", help="用于匹配条目的查询文本"),
+    limit: int = typer.Option(10, "--limit", "-n", min=1, help="最多返回多少条结果"),
+) -> None:
+    """Find related registry entries from all monthly records."""
+    manager = _get_registry_manager()
+    store = _get_registry_store()
+    match_method, entries = manager.find_entries(query, limit)
+    if not entries:
+        console.print("[yellow]没有找到匹配条目。[/yellow]")
+        return
+
+    method_label = {
+        "keywords": "关键词匹配",
+        "summary": "摘要匹配",
+        "llm": "LLM 回退匹配",
+    }[match_method]
+    console.print(Panel(f"[bold]{method_label}[/bold]", style="blue"))
+
+    table = Table(title="匹配结果")
+    table.add_column("文件名", style="cyan")
+    table.add_column("日期", style="white")
+    table.add_column("记录ID", style="green")
+    table.add_column("标题", style="magenta")
+
+    for entry in entries:
+        file_name = store.resolve_month_path(entry.date).name
+        table.add_row(file_name, entry.date.isoformat(), entry.record_id, entry.title)
+
+    console.print(table)
 
 
 if __name__ == "__main__":

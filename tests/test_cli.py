@@ -1,13 +1,14 @@
-"""Tests for CLI commands."""
+﻿"""Tests for CLI commands."""
 
 from datetime import date
-from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
 
 from src.cli import app
+from src.models.registry import InterestStatus, RegistryAttribute, RegistryEntry
 
 runner = CliRunner()
 
@@ -19,19 +20,22 @@ def mock_orchestrator():
     orch.store.has_raw_data.return_value = False
     orch.store.has_analyzed_data.return_value = False
     orch.collect = AsyncMock(return_value={"arxiv": [], "hackernews": []})
-    orch.analyze = AsyncMock(return_value=[])
-    orch.generate_overview = AsyncMock(return_value=(
-        MagicMock(total_items=0), ""
-    ))
-    orch.generate_deep_dive = AsyncMock(return_value=(
-        MagicMock(analyses=[]), ""
-    ))
+    orch.generate_overview = AsyncMock(return_value=(MagicMock(total_items=0), ""))
+    orch.generate_deep_dive = AsyncMock(return_value=(MagicMock(analyses=[]), ""))
     orch.run = AsyncMock(return_value=Path("output/2026-03-10/daily_report.md"))
     orch.get_status.return_value = {
         "llm_provider": "anthropic",
         "llm_model": "test-model",
-        "collectors": ["arxiv", "hackernews", "youtube", "bilibili",
-                        "semantic_scholar", "github_trending", "product_hunt", "tavily"],
+        "collectors": [
+            "arxiv",
+            "hackernews",
+            "youtube",
+            "bilibili",
+            "semantic_scholar",
+            "github_trending",
+            "product_hunt",
+            "tavily",
+        ],
         "config": {
             "arxiv_categories": ["cs.AI"],
             "hn_min_score": 50,
@@ -48,6 +52,7 @@ def mock_orchestrator():
             "report_dates": [],
         },
     }
+    orch.registry_manager = MagicMock()
     return orch
 
 
@@ -113,6 +118,7 @@ class TestCLI:
 
     def test_deep_dive_command(self, mock_orchestrator):
         mock_orchestrator.store.has_analyzed_data.return_value = True
+        mock_orchestrator.store.load_json.return_value = [{"index": 1, "source_item": {}}]
         with patch("src.cli._get_orchestrator", return_value=mock_orchestrator):
             result = runner.invoke(app, ["deep-dive", "--items", "1,2,3"])
 
@@ -144,3 +150,88 @@ class TestCLI:
 
         assert result.exit_code == 0
         assert "test-model" in result.output
+
+    def test_registry_show_command(self):
+        mock_store = MagicMock()
+        mock_store.load_all_entries.return_value = [
+            RegistryEntry(
+                date=date(2026, 3, 25),
+                record_id="20260325-001",
+                title="Test registry item",
+                keywords=["Agent", "Automation"],
+                attribute=RegistryAttribute.PROJECT,
+                summary_ref="SUM-20260325-001",
+                summary_markdown="Summary",
+                interest_status=InterestStatus.QUESTION,
+            )
+        ]
+
+        with patch("src.cli._get_registry_store", return_value=mock_store):
+            result = runner.invoke(app, ["registry", "show"])
+
+        assert result.exit_code == 0
+        mock_store.load_all_entries.assert_called_once()
+
+    def test_registry_show_with_month(self):
+        mock_store = MagicMock()
+        mock_store.load_month_entries.return_value = []
+
+        with patch("src.cli._get_registry_store", return_value=mock_store):
+            result = runner.invoke(app, ["registry", "show", "--month", "2026-03"])
+
+        assert result.exit_code == 0
+        mock_store.load_month_entries.assert_called_once_with("2026-03")
+
+    def test_registry_mark_command(self):
+        mock_store = MagicMock()
+        mock_store.update_interest_status.return_value = RegistryEntry(
+            date=date(2026, 3, 25),
+            record_id="20260325-001",
+            title="Test registry item",
+            keywords=["Agent"],
+            attribute=RegistryAttribute.PROJECT,
+            summary_ref="SUM-20260325-001",
+            summary_markdown="Summary",
+            interest_status=InterestStatus.STAR,
+        )
+
+        with patch("src.cli._get_registry_store", return_value=mock_store):
+            result = runner.invoke(app, ["registry", "mark", "--id", "20260325-001", "--status", "star"])
+
+        assert result.exit_code == 0
+        assert "20260325-001" in result.output
+        mock_store.update_interest_status.assert_called_once()
+
+    def test_registry_mark_invalid_status(self):
+        with patch("src.cli._get_registry_store", return_value=MagicMock()):
+            result = runner.invoke(app, ["registry", "mark", "--id", "20260325-001", "--status", "bad"])
+
+        assert result.exit_code == 1
+
+    def test_registry_find_command(self):
+        mock_manager = MagicMock()
+        mock_manager.find_entries.return_value = (
+            "keywords",
+            [
+                RegistryEntry(
+                    date=date(2026, 3, 25),
+                    record_id="20260325-001",
+                    title="Test registry item",
+                    keywords=["Agent"],
+                    attribute=RegistryAttribute.PROJECT,
+                    summary_ref="SUM-20260325-001",
+                    summary_markdown="Summary",
+                )
+            ],
+        )
+        mock_store = MagicMock()
+        mock_store.resolve_month_path.return_value = Path("records/2026-03-record.md")
+
+        with patch("src.cli._get_registry_manager", return_value=mock_manager), patch(
+            "src.cli._get_registry_store", return_value=mock_store
+        ):
+            result = runner.invoke(app, ["registry", "find", "--query", "agent"])
+
+        assert result.exit_code == 0
+        assert "2026-03-record.md" in result.output
+        mock_manager.find_entries.assert_called_once()

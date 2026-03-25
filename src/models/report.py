@@ -29,6 +29,14 @@ class ReportSection(BaseModel):
     item_count: int = Field(default=0)
 
 
+class OverviewSnippet(BaseModel):
+    """A machine-readable short summary block extracted from the overview report."""
+
+    index: int
+    title: str
+    summary_markdown: str = Field(description="Rendered short summary for this item")
+
+
 class DailyOverview(BaseModel):
     """Stage 1: Overview report data model."""
 

@@ -54,6 +54,7 @@ logs/
 
 # Cache
 .cache/
+.tmp*/
 
 # Claude
 .claude/
@@ -68,3 +69,8 @@ AGENTS.md
 # Config (user-specific, keep example)
 config/sources.yaml
 !config/sources.example.yaml
+
+# Registry
+records/*-record.md
+!records/*-record.example.md
+records/deep_dive_registry.example.md

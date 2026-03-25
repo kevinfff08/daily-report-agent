@@ -1,0 +1,15 @@
+你正在帮助用户从长期 deep-dive 台账中找到最相关的历史条目。
+
+用户输入：
+{query}
+
+返回要求：
+- 只返回 JSON
+- 结构必须是：{{"record_ids": ["YYYYMMDD-XXX", "..."]}}
+- 最多返回 {limit} 个 `record_id`
+- 只返回在记录列表中真实存在的 `record_id`
+- 按相关性从高到低排序
+- 不要返回解释
+
+全部记录（JSON）：
+{records_json}

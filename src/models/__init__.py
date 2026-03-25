@@ -12,9 +12,11 @@ from src.models.report import (
     DeepAnalysis,
     DeepDiveReport,
     IndexEntry,
+    OverviewSnippet,
     ReportSection,
 )
 from src.models.config import SourceConfig
+from src.models.registry import InterestStatus, RegistryAttribute, RegistryEntry
 
 __all__ = [
     "SourceItem",
@@ -27,6 +29,10 @@ __all__ = [
     "DeepAnalysis",
     "DeepDiveReport",
     "IndexEntry",
+    "OverviewSnippet",
     "ReportSection",
     "SourceConfig",
+    "InterestStatus",
+    "RegistryAttribute",
+    "RegistryEntry",
 ]
