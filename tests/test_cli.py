@@ -162,7 +162,7 @@ class TestCLI:
                 attribute=RegistryAttribute.PROJECT,
                 summary_ref="SUM-20260325-001",
                 summary_markdown="Summary",
-                interest_status=InterestStatus.QUESTION,
+                interest_statuses=[InterestStatus.STAR, InterestStatus.QUESTION],
             )
         ]
 
@@ -184,7 +184,7 @@ class TestCLI:
 
     def test_registry_mark_command(self):
         mock_store = MagicMock()
-        mock_store.update_interest_status.return_value = RegistryEntry(
+        mock_store.update_interest_statuses.return_value = RegistryEntry(
             date=date(2026, 3, 25),
             record_id="20260325-001",
             title="Test registry item",
@@ -192,7 +192,7 @@ class TestCLI:
             attribute=RegistryAttribute.PROJECT,
             summary_ref="SUM-20260325-001",
             summary_markdown="Summary",
-            interest_status=InterestStatus.STAR,
+            interest_statuses=[InterestStatus.STAR, InterestStatus.QUESTION],
         )
 
         with patch("src.cli._get_registry_store", return_value=mock_store):
@@ -200,13 +200,39 @@ class TestCLI:
 
         assert result.exit_code == 0
         assert "20260325-001" in result.output
-        mock_store.update_interest_status.assert_called_once()
+        mock_store.update_interest_statuses.assert_called_once_with(
+            "20260325-001",
+            [InterestStatus.STAR],
+            mode="add",
+        )
 
     def test_registry_mark_invalid_status(self):
         with patch("src.cli._get_registry_store", return_value=MagicMock()):
             result = runner.invoke(app, ["registry", "mark", "--id", "20260325-001", "--status", "bad"])
 
         assert result.exit_code == 1
+
+    def test_registry_mark_none_defaults_to_clear(self):
+        mock_store = MagicMock()
+        mock_store.update_interest_statuses.return_value = RegistryEntry(
+            date=date(2026, 3, 25),
+            record_id="20260325-001",
+            title="Test registry item",
+            keywords=["Agent"],
+            attribute=RegistryAttribute.PROJECT,
+            summary_ref="SUM-20260325-001",
+            summary_markdown="Summary",
+        )
+
+        with patch("src.cli._get_registry_store", return_value=mock_store):
+            result = runner.invoke(app, ["registry", "mark", "--id", "20260325-001", "--status", "none"])
+
+        assert result.exit_code == 0
+        mock_store.update_interest_statuses.assert_called_once_with(
+            "20260325-001",
+            [],
+            mode="clear",
+        )
 
     def test_registry_find_command(self):
         mock_manager = MagicMock()

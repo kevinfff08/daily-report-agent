@@ -82,6 +82,8 @@ echo   python -m src.cli status                    Show system status
 echo   python -m src.cli collect                   Collect today's data
 echo   python -m src.cli report                    Generate overview report
 echo   python -m src.cli deep-dive --items "1,2,3" Generate deep dive report
+echo   python -m src.cli registry mark --id 20260325-001 --status star
+echo                                              Mark a registry item as highly relevant
 echo   python -m src.cli run                       Run full pipeline
 echo ============================================
 echo.

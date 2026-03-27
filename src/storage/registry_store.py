@@ -64,7 +64,7 @@ class RegistryStore:
                     summary_ref=summary_ref,
                     summary_markdown=summary_map.get(summary_ref, ""),
                     source_index=source_index_map.get(summary_ref),
-                    interest_status=InterestStatus.from_symbol(status_cell),
+                    interest_statuses=status_cell,
                 )
             except Exception as exc:
                 logger.warning("Skipping invalid registry row: %s", exc)
@@ -113,7 +113,7 @@ class RegistryStore:
             key = entry.record_id
             existing = by_key.get(key)
             if existing is not None:
-                entry.interest_status = existing.interest_status
+                entry.interest_statuses = list(existing.interest_statuses)
                 entry.record_id = existing.record_id
                 entry.summary_ref = existing.summary_ref
             by_key[key] = entry
@@ -133,7 +133,16 @@ class RegistryStore:
         return saved_paths
 
     def update_interest_status(self, record_id: str, status: InterestStatus) -> RegistryEntry:
-        """Update the interest status for a single record across months."""
+        """Backward-compatible alias for appending a single status."""
+        return self.update_interest_statuses(record_id, [status], mode="add")
+
+    def update_interest_statuses(
+        self,
+        record_id: str,
+        statuses: list[InterestStatus],
+        mode: str = "add",
+    ) -> RegistryEntry:
+        """Update the interest statuses for a single record across months."""
         for path in sorted(self.base_dir.glob("*-record.md")):
             if path.name.endswith(".example.md"):
                 continue
@@ -141,7 +150,11 @@ class RegistryStore:
             entries = self.load_month_entries(year_month)
             for entry in entries:
                 if entry.record_id == record_id:
-                    entry.interest_status = status
+                    entry.interest_statuses = self._merge_interest_statuses(
+                        entry.interest_statuses,
+                        statuses,
+                        mode,
+                    )
                     self.save_month_entries(entry.date, entries)
                     return entry
 
@@ -160,7 +173,7 @@ class RegistryStore:
             f"# Deep Dive 长期关注台账（{year_month}）\n\n"
             "> 自动登记每次 `deep-dive` 生成的条目。\n"
             "> 可直接手动编辑“我的关注状态”列，或使用 CLI 命令维护。\n"
-            "> 状态说明：`*` = 非常关注，`?` = 需要进一步学习，`✓` = 可能有用。\n\n"
+            "> 状态说明：`*` = 非常关注，`?` = 需要进一步学习，`✓` = 可能有用；可同时保留多个状态。\n\n"
             "| 日期 | 记录ID | 标题 | 关键词 | 属性 | 摘要 | 我的关注状态 |\n"
             "| --- | --- | --- | --- | --- | --- | --- |"
         )
@@ -199,13 +212,35 @@ class RegistryStore:
     def _sanitize_cell(text: str) -> str:
         return " ".join(text.replace("|", " / ").replace("\n", " ").split()).strip()
 
+    @staticmethod
+    def _merge_interest_statuses(
+        existing: list[InterestStatus],
+        updates: list[InterestStatus],
+        mode: str,
+    ) -> list[InterestStatus]:
+        normalized_existing = [status for status in InterestStatus.ordered() if status in existing]
+        normalized_updates = [status for status in InterestStatus.ordered() if status in updates]
+
+        if mode == "clear":
+            return []
+        if mode == "set":
+            return normalized_updates
+        if mode == "remove":
+            return [status for status in normalized_existing if status not in normalized_updates]
+
+        merged = list(normalized_existing)
+        for status in normalized_updates:
+            if status not in merged:
+                merged.append(status)
+        return [status for status in InterestStatus.ordered() if status in merged]
+
     def _format_row(self, entry: RegistryEntry) -> str:
         keywords = " / ".join(self._sanitize_cell(keyword) for keyword in entry.keywords)
         summary_link = f"[{entry.summary_ref}](#{entry.summary_ref.lower()})"
         return (
             f"| {entry.date.isoformat()} | {entry.record_id} | "
             f"{self._sanitize_cell(entry.title)} | {keywords} | "
-            f"{entry.attribute.value} | {summary_link} | {entry.interest_status.value} |"
+            f"{entry.attribute.value} | {summary_link} | {entry.interest_status_display} |"
         )
 
     def _format_summary_block(self, entry: RegistryEntry) -> list[str]:

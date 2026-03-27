@@ -40,6 +40,28 @@ _STATUS_OPTION_TO_SYMBOL = {
 }
 
 
+def _parse_status_argument(value: str) -> list[InterestStatus]:
+    """Parse one or more CLI status tokens."""
+    parsed: list[InterestStatus] = []
+    for raw in value.split(","):
+        normalized = raw.strip().lower()
+        if not normalized:
+            continue
+        if normalized not in _STATUS_OPTION_TO_SYMBOL:
+            raise ValueError(f"Invalid status: {raw.strip()}")
+        status = _STATUS_OPTION_TO_SYMBOL[normalized]
+        if status == InterestStatus.NONE:
+            return []
+        if status not in parsed:
+            parsed.append(status)
+    return parsed
+
+
+def _status_argument_requests_clear(value: str) -> bool:
+    """Return whether the CLI argument explicitly asked to clear statuses."""
+    return any(raw.strip().lower() == "none" for raw in value.split(","))
+
+
 def _get_orchestrator() -> "DailyReportOrchestrator":
     """Create the orchestrator from environment config."""
     from src.orchestrator import DailyReportOrchestrator
@@ -215,7 +237,10 @@ def registry_show(
             console.print(f"[red]Invalid status: {status}[/red]")
             raise typer.Exit(1)
         wanted_status = _STATUS_OPTION_TO_SYMBOL[normalized]
-        entries = [entry for entry in entries if entry.interest_status == wanted_status]
+        if wanted_status == InterestStatus.NONE:
+            entries = [entry for entry in entries if not entry.interest_statuses]
+        else:
+            entries = [entry for entry in entries if entry.has_interest_status(wanted_status)]
 
     entries = entries[:limit]
     if not entries:
@@ -239,7 +264,7 @@ def registry_show(
             " / ".join(entry.keywords),
             entry.attribute.value,
             entry.summary_ref,
-            entry.interest_status.value,
+            entry.interest_status_display,
         )
 
     console.print(table)
@@ -248,22 +273,39 @@ def registry_show(
 @registry_app.command("mark")
 def registry_mark(
     record_id: str = typer.Option(..., "--id", help="记录ID，例如 20260325-001"),
-    status: str = typer.Option(..., "--status", "-s", help="目标状态: star, question, check, none"),
+    status: str = typer.Option(..., "--status", "-s", help="目标状态: star, question, check, none；可用逗号传多个"),
+    mode: str = typer.Option("add", "--mode", help="更新模式: add, set, remove, clear"),
 ) -> None:
     """Update the interest status for a registry item."""
-    normalized = status.strip().lower()
-    if normalized not in _STATUS_OPTION_TO_SYMBOL:
+    normalized_mode = mode.strip().lower()
+    if normalized_mode not in {"add", "set", "remove", "clear"}:
+        console.print(f"[red]Invalid mode: {mode}[/red]")
+        raise typer.Exit(1)
+
+    try:
+        statuses = _parse_status_argument(status)
+    except ValueError:
         console.print(f"[red]Invalid status: {status}[/red]")
+        raise typer.Exit(1)
+
+    requested_clear = _status_argument_requests_clear(status)
+    if requested_clear and normalized_mode == "add":
+        normalized_mode = "clear"
+
+    if normalized_mode == "clear":
+        statuses = []
+    elif not statuses:
+        console.print("[red]Status cannot be empty unless mode=clear or status=none[/red]")
         raise typer.Exit(1)
 
     store = _get_registry_store()
     try:
-        entry = store.update_interest_status(record_id, _STATUS_OPTION_TO_SYMBOL[normalized])
+        entry = store.update_interest_statuses(record_id, statuses, mode=normalized_mode)
     except KeyError:
         console.print(f"[red]未找到记录 {record_id}[/red]")
         raise typer.Exit(1)
 
-    display_status = entry.interest_status.value or "(空)"
+    display_status = entry.interest_status_display or "(空)"
     console.print(f"[bold green]已更新[/bold green] {record_id} -> {display_status}")
 
 

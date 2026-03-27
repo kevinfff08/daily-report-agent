@@ -30,7 +30,7 @@ class TestRegistryStore:
             attribute=RegistryAttribute.PROJECT,
             summary_ref="SUM-20260325-001",
             summary_markdown="Original summary",
-            interest_status=InterestStatus.STAR,
+            interest_statuses=[InterestStatus.STAR, InterestStatus.QUESTION],
         )
         updated = RegistryEntry(
             date=date(2026, 3, 25),
@@ -49,7 +49,7 @@ class TestRegistryStore:
         assert len(entries) == 1
         assert entries[0].title == "Updated title"
         assert entries[0].record_id == "20260325-001"
-        assert entries[0].interest_status == InterestStatus.STAR
+        assert entries[0].interest_statuses == [InterestStatus.STAR, InterestStatus.QUESTION]
         assert entries[0].attribute == RegistryAttribute.PRODUCT
         assert entries[0].summary_markdown == "Updated summary"
 
@@ -94,11 +94,66 @@ class TestRegistryStore:
         )
 
         store.upsert_entries([entry])
-        updated = store.update_interest_status("20260401-001", InterestStatus.CHECK)
+        updated = store.update_interest_statuses("20260401-001", [InterestStatus.CHECK], mode="add")
 
-        assert updated.interest_status == InterestStatus.CHECK
+        assert updated.interest_statuses == [InterestStatus.CHECK]
         loaded = store.load_month_entries("2026-04")
-        assert loaded[0].interest_status == InterestStatus.CHECK
+        assert loaded[0].interest_statuses == [InterestStatus.CHECK]
+
+    def test_load_month_entries_accepts_multiple_statuses(self, tmp_path: Path) -> None:
+        store = _make_store(tmp_path)
+        path = tmp_path / "records" / "2026-03-record.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "\n".join(
+                [
+                    "# Deep Dive 长期关注台账（2026-03）",
+                    "",
+                    "| 日期 | 记录ID | 标题 | 关键词 | 属性 | 摘要 | 我的关注状态 |",
+                    "| --- | --- | --- | --- | --- | --- | --- |",
+                    "| 2026-03-25 | 20260325-001 | Sample | a / b | 项目 | [SUM-20260325-001](#sum-20260325-001) | * ? ✓ |",
+                    "",
+                    "## 摘要附录",
+                    "",
+                    "### SUM-20260325-001",
+                    "<!-- record_id: 20260325-001 -->",
+                    "<!-- summary-start -->",
+                    "Summary",
+                    "<!-- summary-end -->",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        entries = store.load_month_entries("2026-03")
+
+        assert len(entries) == 1
+        assert entries[0].interest_statuses == [
+            InterestStatus.STAR,
+            InterestStatus.QUESTION,
+            InterestStatus.CHECK,
+        ]
+
+    def test_update_interest_statuses_supports_add_remove_and_clear(self, tmp_path: Path) -> None:
+        store = _make_store(tmp_path)
+        entry = RegistryEntry(
+            date=date(2026, 4, 1),
+            record_id="20260401-001",
+            title="Sample title",
+            keywords=["multimodal"],
+            attribute=RegistryAttribute.PAPER,
+            summary_ref="SUM-20260401-001",
+            summary_markdown="Sample summary",
+            interest_statuses=[InterestStatus.STAR],
+        )
+
+        store.upsert_entries([entry])
+        store.update_interest_statuses("20260401-001", [InterestStatus.QUESTION], mode="add")
+        store.update_interest_statuses("20260401-001", [InterestStatus.STAR], mode="remove")
+        updated = store.update_interest_statuses("20260401-001", [], mode="clear")
+
+        assert updated.interest_statuses == []
 
     def test_monthly_file_contains_summary_appendix(self, tmp_path: Path) -> None:
         store = _make_store(tmp_path)

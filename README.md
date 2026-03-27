@@ -139,6 +139,7 @@ python -m src.cli deep-dive --date 2026-03-25 --items "1,3,15"
 - `*`：非常关注
 - `?`：需要进一步学习
 - `✓`：可能有用
+- 同一条记录可同时拥有多个状态，例如 `* ?`
 
 ### 台账命令
 
@@ -155,8 +156,10 @@ python -m src.cli registry show --status star
 # 更新关注状态
 python -m src.cli registry mark --id 20260325-001 --status star
 python -m src.cli registry mark --id 20260325-001 --status question
+python -m src.cli registry mark --id 20260325-001 --status star,question --mode set
 python -m src.cli registry mark --id 20260325-001 --status check
 python -m src.cli registry mark --id 20260325-001 --status none
+python -m src.cli registry mark --id 20260325-001 --status star --mode remove
 
 # 检索最接近的历史条目
 python -m src.cli registry find --query "multi-agent safety"
@@ -207,7 +210,7 @@ python -m src.cli deep-dive --items "1,5,12"
 
 # 4. 深度分析完成后，条目会自动登记到当月 records/YYYY-MM-record.md
 
-# 5. 后续阅读完可更新关注状态
+# 5. 后续阅读完可更新关注状态（可叠加多个状态）
 python -m src.cli registry mark --id 20260325-001 --status star
 ```
 
