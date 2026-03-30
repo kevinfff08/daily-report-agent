@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
-
+from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.enrichers.paper_enricher import PaperEnricher
@@ -46,6 +45,22 @@ def s2_item_with_arxiv() -> SourceItem:
 
 
 @pytest.fixture
+def s2_item_with_pdf_url() -> SourceItem:
+    return SourceItem(
+        id="s2:pdf123",
+        source_type=SourceType.SEMANTIC_SCHOLAR,
+        title="S2 Paper with open access PDF",
+        url="https://www.semanticscholar.org/paper/pdf123",
+        published=datetime(2026, 3, 10, tzinfo=timezone.utc),
+        content_snippet="Abstract.",
+        metadata={
+            "paper_id": "pdf123",
+            "pdf_url": "https://papers.example.com/open-access.pdf",
+        },
+    )
+
+
+@pytest.fixture
 def s2_item_no_pdf() -> SourceItem:
     return SourceItem(
         id="s2:xyz789",
@@ -54,7 +69,7 @@ def s2_item_no_pdf() -> SourceItem:
         url="https://www.semanticscholar.org/paper/xyz789",
         published=datetime(2026, 3, 10, tzinfo=timezone.utc),
         content_snippet="Abstract.",
-        metadata={"paper_id": "xyz789"},
+        metadata={"paper_id": "xyz789", "doi": "10.1234/example"},
     )
 
 
@@ -66,6 +81,10 @@ class TestPaperEnricher:
     def test_get_pdf_url_s2_with_arxiv(self, paper_enricher: PaperEnricher, s2_item_with_arxiv: SourceItem) -> None:
         url = paper_enricher._get_pdf_url(s2_item_with_arxiv)
         assert url == "https://arxiv.org/pdf/2603.99999"
+
+    def test_get_pdf_url_s2_with_open_access_pdf(self, paper_enricher: PaperEnricher, s2_item_with_pdf_url: SourceItem) -> None:
+        url = paper_enricher._get_pdf_url(s2_item_with_pdf_url)
+        assert url == "https://papers.example.com/open-access.pdf"
 
     def test_get_pdf_url_s2_no_pdf(self, paper_enricher: PaperEnricher, s2_item_no_pdf: SourceItem) -> None:
         url = paper_enricher._get_pdf_url(s2_item_no_pdf)
@@ -87,8 +106,38 @@ class TestPaperEnricher:
 
     @pytest.mark.asyncio
     async def test_enrich_no_pdf_url(self, paper_enricher: PaperEnricher, s2_item_no_pdf: SourceItem) -> None:
-        result = await paper_enricher.enrich(s2_item_no_pdf)
-        assert result == ""
+        html = """
+        <html>
+          <head><meta name="citation_pdf_url" content="/content/paper.pdf"></head>
+          <body><p>Publisher landing page</p></body>
+        </html>
+        """
+        response_html = {"kind": "html", "content": html.encode("utf-8"), "url": "https://publisher.example/article"}
+        with patch.object(paper_enricher, "_fetch_source", new_callable=AsyncMock, return_value=response_html), \
+             patch.object(paper_enricher, "_extract_pdf_text", new_callable=AsyncMock, return_value="Recovered PDF text"):
+            result = await paper_enricher.enrich(s2_item_no_pdf)
+        assert result == "Recovered PDF text"
+
+    @pytest.mark.asyncio
+    async def test_enrich_falls_back_to_landing_page_text(
+        self,
+        paper_enricher: PaperEnricher,
+        s2_item_no_pdf: SourceItem,
+    ) -> None:
+        html = """
+        <html>
+          <body>
+            <article>
+              <h1>Paper landing page</h1>
+              <p>This page contains the article full text fallback.</p>
+            </article>
+          </body>
+        </html>
+        """
+        response_html = {"kind": "html", "content": html.encode("utf-8"), "url": "https://publisher.example/article"}
+        with patch.object(paper_enricher, "_fetch_source", new_callable=AsyncMock, return_value=response_html):
+            result = await paper_enricher.enrich(s2_item_no_pdf)
+        assert "article full text fallback" in result
 
     @pytest.mark.asyncio
     async def test_enrich_extract_failure(self, paper_enricher: PaperEnricher, arxiv_item: SourceItem) -> None:

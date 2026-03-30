@@ -6,6 +6,7 @@ No LLM calls — pure heuristic rules for fast, cheap coarse filtering.
 
 from __future__ import annotations
 
+from src.filters.recent_duplicates import RecentDuplicateMatch, penalty_for_matches
 from src.logging_config import get_logger
 from src.models.source import SourceItem, SourceType
 
@@ -33,7 +34,11 @@ class ItemFilter:
         self.industry_limit = industry_limit
         self.social_limit = social_limit
 
-    def filter(self, items: list[SourceItem]) -> list[SourceItem]:
+    def filter(
+        self,
+        items: list[SourceItem],
+        recent_duplicate_matches: dict[str, list[RecentDuplicateMatch]] | None = None,
+    ) -> list[SourceItem]:
         """Apply full filter pipeline: dedup → score → rank → top-N.
 
         Returns filtered items, grouped in order: papers, industry, social.
@@ -47,12 +52,15 @@ class ItemFilter:
         social = [i for i in deduped if i.source_type in _SOCIAL_TYPES]
 
         # Step 3: Score and sort each category
-        papers_ranked = self._rank_papers(papers)[:self.paper_limit]
-        industry_ranked = self._rank_industry(industry)[:self.industry_limit]
-        social_ranked = self._rank_social(social)[:self.social_limit]
+        papers_ranked = self._rank_papers(papers, recent_duplicate_matches)[:self.paper_limit]
+        industry_ranked = self._rank_industry(industry, recent_duplicate_matches)[:self.industry_limit]
+        social_ranked = self._rank_social(social, recent_duplicate_matches)[:self.social_limit]
 
         total_before = len(items)
         total_after = len(papers_ranked) + len(industry_ranked) + len(social_ranked)
+        penalized = 0
+        if recent_duplicate_matches:
+            penalized = sum(1 for item in deduped if item.id in recent_duplicate_matches)
         logger.info(
             "Filter: %d → %d (dedup=%d, papers=%d/%d, industry=%d/%d, social=%d/%d)",
             total_before, total_after, len(deduped),
@@ -112,6 +120,11 @@ class ItemFilter:
 
         scored.sort(key=lambda x: x[0], reverse=True)
         return [item for _, item in scored]
+
+
+from src.filters.ranked_item_filter import ItemFilter as ItemFilter
+
+if False:
 
     def _score_paper(self, item: SourceItem) -> float:
         """Compute importance score for a single paper."""

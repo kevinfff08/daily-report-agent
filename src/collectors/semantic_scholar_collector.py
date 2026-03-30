@@ -12,7 +12,10 @@ from src.collectors.base import BaseCollector
 from src.models.source import SourceItem, SourceType
 
 S2_API = "https://api.semanticscholar.org/graph/v1/paper/search"
-S2_FIELDS = "title,abstract,authors,year,publicationDate,citationCount,url,externalIds"
+S2_FIELDS = (
+    "title,abstract,authors,year,publicationDate,citationCount,url,"
+    "externalIds,openAccessPdf,isOpenAccess"
+)
 
 
 class SemanticScholarCollector(BaseCollector):
@@ -116,6 +119,10 @@ class SemanticScholarCollector(BaseCollector):
             external_ids = paper.get("externalIds", {}) or {}
             arxiv_id = external_ids.get("ArXiv", "")
             doi = external_ids.get("DOI", "")
+            open_access_pdf = paper.get("openAccessPdf") or {}
+            pdf_url = ""
+            if isinstance(open_access_pdf, dict):
+                pdf_url = open_access_pdf.get("url", "") or ""
 
             url = paper.get("url", f"https://www.semanticscholar.org/paper/{paper_id}")
 
@@ -140,6 +147,8 @@ class SemanticScholarCollector(BaseCollector):
                     "year": paper.get("year"),
                     "arxiv_id": arxiv_id,
                     "doi": doi,
+                    "pdf_url": pdf_url,
+                    "is_open_access": bool(paper.get("isOpenAccess")),
                     "source_name": "Semantic Scholar",
                 },
             ))

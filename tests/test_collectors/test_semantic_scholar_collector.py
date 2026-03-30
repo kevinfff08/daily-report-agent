@@ -23,6 +23,8 @@ SEARCH_RESPONSE = {
             "citationCount": 150,
             "url": "https://www.semanticscholar.org/paper/abc123",
             "externalIds": {"ArXiv": "2603.99999", "DOI": "10.1234/test"},
+            "openAccessPdf": {"url": "https://pdf.host/test.pdf"},
+            "isOpenAccess": True,
         },
         {
             "paperId": "def456",
@@ -34,6 +36,8 @@ SEARCH_RESPONSE = {
             "citationCount": 50,
             "url": "https://www.semanticscholar.org/paper/def456",
             "externalIds": {},
+            "openAccessPdf": None,
+            "isOpenAccess": False,
         },
     ]
 }
@@ -65,6 +69,8 @@ class TestSemanticScholarCollector:
         assert items[0].id == "s2:abc123"
         assert items[0].metadata["citation_count"] == 150
         assert items[0].metadata["arxiv_id"] == "2603.99999"
+        assert items[0].metadata["pdf_url"] == "https://pdf.host/test.pdf"
+        assert items[0].metadata["is_open_access"] is True
 
     @pytest.mark.asyncio
     async def test_no_topics(self, store):

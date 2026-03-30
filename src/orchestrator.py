@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-from src.filters import ItemFilter
+from src.filters import ItemFilter, RecentDuplicateMatcher
 from src.collectors import (
     ArxivCollector,
     BilibiliCollector,
@@ -72,6 +72,7 @@ class DailyReportOrchestrator:
 
         # Filter and reporters
         self.item_filter = ItemFilter()
+        self.recent_duplicate_matcher = RecentDuplicateMatcher(self.store)
         self.overview_reporter = OverviewReporter(self.llm, self.store)
         self.deep_dive_reporter = DeepDiveReporter(self.llm, self.store)
         self.registry_manager = registry_manager or DeepDiveRegistryManager(
@@ -137,8 +138,26 @@ class DailyReportOrchestrator:
             logger.warning("No raw data for %s. Run 'collect' first.", target_date)
             return DailyOverview(date=target_date, summary="No data.", total_items=0), ""
 
+        history_items = self.recent_duplicate_matcher.load_recent_history(target_date)
+        recent_duplicate_matches = self.recent_duplicate_matcher.match_items(
+            target_date,
+            all_items,
+            history_items,
+        )
+        self.store.save_json(
+            f"reports/{target_date.isoformat()}/recent_duplicate_matches.json",
+            self.recent_duplicate_matcher.build_debug_payload(
+                target_date,
+                all_items,
+                recent_duplicate_matches,
+            ),
+        )
+
         # Rule-based filtering: dedup, score, rank, top-N
-        filtered_items = self.item_filter.filter(all_items)
+        filtered_items = self.item_filter.filter(
+            all_items,
+            recent_duplicate_matches=recent_duplicate_matches,
+        )
 
         return await self.overview_reporter.generate(
             target_date, filtered_items, total_raw_count=len(all_items),

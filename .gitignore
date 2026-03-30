@@ -37,6 +37,7 @@ desktop.ini
 
 # Testing
 .pytest_cache/
+.pytest-tmp/
 htmlcov/
 .coverage
 coverage.xml
