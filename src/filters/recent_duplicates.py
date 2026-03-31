@@ -58,10 +58,10 @@ class RecentDuplicateMatcher:
         for delta_days in range(1, self.lookback_days + 1):
             report_date = target_date - timedelta(days=delta_days)
             snippets = self.store.load_json(
-                f"reports/{report_date.isoformat()}/overview_snippets.json"
+                self.store.layer_relative_path("reports", report_date, "overview_snippets.json")
             )
             items_index = self.store.load_json(
-                f"reports/{report_date.isoformat()}/items_index.json"
+                self.store.layer_relative_path("reports", report_date, "items_index.json")
             )
             if not isinstance(snippets, list) or not isinstance(items_index, list):
                 continue

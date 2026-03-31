@@ -88,7 +88,7 @@ def test_generate_deep_dive_registers_entries_local_tmp(sample_arxiv_item) -> No
             "# report",
         ))
         orchestrator.store.save_json(
-            "reports/2026-03-25/items_index.json",
+            orchestrator.store.layer_relative_path("reports", date(2026, 3, 25), "items_index.json"),
             [{"index": 1, "source_item": sample_arxiv_item.model_dump(mode="json")}],
         )
 
@@ -217,15 +217,15 @@ def test_generate_overview_downranks_recent_duplicates_and_saves_debug_json_loca
             config_dir=str(temp_path / "config"),
         )
         orchestrator.store.save_json(
-            f"raw/{target_date.isoformat()}/github_trending.json",
+            orchestrator.store.layer_relative_path("raw", target_date, "github_trending.json"),
             [duplicate_item, fresh_item],
         )
         orchestrator.store.save_json(
-            f"reports/{history_date.isoformat()}/items_index.json",
+            orchestrator.store.layer_relative_path("reports", history_date, "items_index.json"),
             [{"index": 1, "source_item": duplicate_item}],
         )
         orchestrator.store.save_json(
-            f"reports/{history_date.isoformat()}/overview_snippets.json",
+            orchestrator.store.layer_relative_path("reports", history_date, "overview_snippets.json"),
             [{"index": 1, "title": duplicate_item["title"], "summary_markdown": "Kept yesterday"}],
         )
         orchestrator.overview_reporter.generate = AsyncMock(
@@ -246,7 +246,7 @@ def test_generate_overview_downranks_recent_duplicates_and_saves_debug_json_loca
         assert filtered_items[1].id == "github:owner/duplicate-project"
 
         debug_rows = orchestrator.store.load_json(
-            f"reports/{target_date.isoformat()}/recent_duplicate_matches.json"
+            orchestrator.store.layer_relative_path("reports", target_date, "recent_duplicate_matches.json")
         )
         assert isinstance(debug_rows, list)
         assert debug_rows[0]["item_id"] == "github:owner/duplicate-project"

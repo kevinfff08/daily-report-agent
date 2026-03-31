@@ -120,7 +120,9 @@ class DeepDiveRegistryManager:
     def _load_overview_snippets(self, target_date: date) -> dict[int, OverviewSnippet]:
         snippets: list[OverviewSnippet] = []
         if self.local_store is not None:
-            raw = self.local_store.load_json(f"reports/{target_date.isoformat()}/overview_snippets.json")
+            raw = self.local_store.load_json(
+                self.local_store.layer_relative_path("reports", target_date, "overview_snippets.json")
+            )
             if isinstance(raw, list):
                 for item in raw:
                     try:
@@ -129,7 +131,10 @@ class DeepDiveRegistryManager:
                         logger.warning("Skipping invalid overview snippet: %s", exc)
 
         if not snippets:
-            output_path = Path("output") / target_date.isoformat() / "daily_report.md"
+            if self.local_store is not None:
+                output_path = self.local_store.output_path(target_date, "daily_report.md")
+            else:
+                output_path = Path("output") / LocalStore.relative_date_dir(target_date) / "daily_report.md"
             if output_path.exists():
                 snippets = extract_overview_snippets(output_path.read_text(encoding="utf-8"))
 

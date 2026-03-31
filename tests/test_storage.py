@@ -73,6 +73,7 @@ class TestLocalStore:
 
         assert path.exists()
         assert path.read_text(encoding="utf-8") == "# Test Report"
+        assert "2026-03" in str(path)
         assert "2026-03-10" in str(path)
         assert "reports" in str(path)
 
@@ -84,6 +85,7 @@ class TestLocalStore:
 
         assert path.exists()
         assert path.read_text(encoding="utf-8") == "# Output"
+        assert "2026-03" in str(path)
 
     def test_has_raw_data(self, store, sample_arxiv_item):
         target_date = date(2026, 3, 10)
@@ -119,7 +121,7 @@ class TestLocalStore:
 
     def test_list_dates_invalid_dir_names_ignored(self, store, tmp_data_dir):
         (tmp_data_dir / "raw" / "not-a-date").mkdir(parents=True)
-        (tmp_data_dir / "raw" / "2026-03-10").mkdir(parents=True)
+        (tmp_data_dir / "raw" / "2026-03" / "2026-03-10").mkdir(parents=True)
 
         dates = store.list_dates("raw")
         assert len(dates) == 1

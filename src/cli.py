@@ -142,7 +142,7 @@ def report(
 
     overview, _ = asyncio.run(orch.generate_overview(d))
     console.print(f"\n[bold green]Report generated: {overview.total_items} items[/bold green]")
-    console.print(f"Output: output/{d.isoformat()}/daily_report.md")
+    console.print(f"Output: {orch.store.output_path(d, 'daily_report.md')}")
 
 
 @app.command(name="deep-dive")
@@ -164,14 +164,14 @@ def deep_dive(
     console.print(Panel(f"[bold]Deep dive for {d}: items {indices}[/bold]", style="blue"))
 
     orch = _get_orchestrator()
-    items_index = orch.store.load_json(f"reports/{d.isoformat()}/items_index.json")
+    items_index = orch.store.load_json(orch.store.layer_relative_path("reports", d, "items_index.json"))
     if not items_index:
         console.print("[red]No items index found. Run 'report' first to generate the overview.[/red]")
         raise typer.Exit(1)
 
     report_model, _ = asyncio.run(orch.generate_deep_dive(d, indices))
     console.print(f"\n[bold green]Deep dive complete: {len(report_model.analyses)} analyses[/bold green]")
-    console.print(f"Output: output/{d.isoformat()}/deep_dive_report.md")
+    console.print(f"Output: {orch.store.output_path(d, 'deep_dive_report.md')}")
 
 
 @app.command()

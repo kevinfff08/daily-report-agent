@@ -145,7 +145,7 @@ class DailyReportOrchestrator:
             history_items,
         )
         self.store.save_json(
-            f"reports/{target_date.isoformat()}/recent_duplicate_matches.json",
+            self.store.layer_relative_path("reports", target_date, "recent_duplicate_matches.json"),
             self.recent_duplicate_matcher.build_debug_payload(
                 target_date,
                 all_items,
@@ -173,7 +173,7 @@ class DailyReportOrchestrator:
 
         # Load the items index saved by overview reporter
         items_index = self.store.load_json(
-            f"reports/{target_date.isoformat()}/items_index.json"
+            self.store.layer_relative_path("reports", target_date, "items_index.json")
         )
         if not items_index:
             logger.warning("No items_index found for %s. Run 'report' first.", target_date)
@@ -195,7 +195,7 @@ class DailyReportOrchestrator:
         """Execute full pipeline: collect → overview report."""
         await self.collect(target_date)
         overview, markdown = await self.generate_overview(target_date)
-        output_path = Path("output") / target_date.isoformat() / "daily_report.md"
+        output_path = self.store.output_path(target_date, "daily_report.md")
         logger.info("=== Pipeline complete. Report at %s ===", output_path)
         return output_path
 

@@ -1,13 +1,24 @@
 """Centralized logging configuration for DailyReport."""
 
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 _INITIALIZED = False
 _LOG_DIR = Path("logs")
 _ROOT_LOGGER_NAME = "dailyreport"
 _FORMAT = "%(asctime)s | %(levelname)-7s | %(name)-35s | %(message)s"
+
+
+def log_month_dir(target_date: date) -> Path:
+    """Return the YYYY-MM log subdirectory for a given date."""
+    return Path(target_date.strftime("%Y-%m"))
+
+
+def log_file_path(target_date: date, log_dir: str | Path | None = None) -> Path:
+    """Return the full log file path for a given date."""
+    base_dir = Path(log_dir) if log_dir else _LOG_DIR
+    return base_dir / log_month_dir(target_date) / f"{target_date.isoformat()}.log"
 
 
 def setup_logging(log_dir: str | Path | None = None) -> None:
@@ -20,10 +31,9 @@ def setup_logging(log_dir: str | Path | None = None) -> None:
         return
     _INITIALIZED = True
 
-    log_path = Path(log_dir) if log_dir else _LOG_DIR
-    log_path.mkdir(parents=True, exist_ok=True)
-
-    log_file = log_path / f"{datetime.now().strftime('%Y-%m-%d')}.log"
+    target_date = datetime.now().date()
+    log_file = log_file_path(target_date, log_dir)
+    log_file.parent.mkdir(parents=True, exist_ok=True)
     formatter = logging.Formatter(_FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
 
     root = logging.getLogger(_ROOT_LOGGER_NAME)

@@ -19,10 +19,12 @@ def mock_orchestrator():
     orch.store = MagicMock()
     orch.store.has_raw_data.return_value = False
     orch.store.has_analyzed_data.return_value = False
+    orch.store.layer_relative_path.side_effect = lambda layer, d, filename: f"{layer}/{d.strftime('%Y-%m')}/{d.isoformat()}/{filename}"
+    orch.store.output_path.side_effect = lambda d, filename: Path("output") / d.strftime("%Y-%m") / d.isoformat() / filename
     orch.collect = AsyncMock(return_value={"arxiv": [], "hackernews": []})
     orch.generate_overview = AsyncMock(return_value=(MagicMock(total_items=0), ""))
     orch.generate_deep_dive = AsyncMock(return_value=(MagicMock(analyses=[]), ""))
-    orch.run = AsyncMock(return_value=Path("output/2026-03-10/daily_report.md"))
+    orch.run = AsyncMock(return_value=Path("output/2026-03/2026-03-10/daily_report.md"))
     orch.get_status.return_value = {
         "llm_provider": "anthropic",
         "llm_model": "test-model",

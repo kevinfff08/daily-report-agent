@@ -179,9 +179,9 @@ CLI 输出固定显示：`文件名`、`日期`、`记录ID`、`标题`。
 
 ```text
 data/
-  raw/YYYY-MM-DD/                # 原始采集结果
-  analyzed/YYYY-MM-DD/           # 分析结果
-  reports/YYYY-MM-DD/
+  raw/YYYY-MM/YYYY-MM-DD/                # 原始采集结果
+  analyzed/YYYY-MM/YYYY-MM-DD/           # 分析结果
+  reports/YYYY-MM/YYYY-MM-DD/
     overview.md                  # Stage 1 markdown
     overview_model.json          # Stage 1 结构化结果
     items_index.json             # 候选条目索引
@@ -190,9 +190,12 @@ data/
     deep_dive.md                 # Stage 2 markdown 数据
 
 output/
-  YYYY-MM-DD/
+  YYYY-MM/YYYY-MM-DD/
     daily_report.md              # 最终概览报告
     deep_dive_report.md          # 最终深度分析报告
+
+logs/
+  YYYY-MM/YYYY-MM-DD.log
 
 records/
   YYYY-MM-record.md              # 月度长期台账（gitignored）
@@ -205,7 +208,7 @@ records/
 # 1. 跑当日概览
 python -m src.cli run
 
-# 2. 阅读 output/YYYY-MM-DD/daily_report.md，挑选编号
+# 2. 阅读 output/YYYY-MM/YYYY-MM-DD/daily_report.md，挑选编号
 
 # 3. 生成深度分析
 python -m src.cli deep-dive --items "1,5,12"
@@ -224,7 +227,7 @@ python -m pytest tests/ -v
 ```
 
 日志：
-- 文件日志：`logs/YYYY-MM-DD.log`
+- 文件日志：`logs/YYYY-MM/YYYY-MM-DD.log`
 - 控制台：`WARNING+`
 
 ## 项目结构
@@ -255,4 +258,4 @@ src/
 - 只对比前 3 天真正进入 `daily_report` 正文的条目，不看全部候选索引
 - 处理方式是降权，不是硬删除；当天确实重要的内容仍可能保留
 - 判重顺序固定为：稳定 ID / URL 优先，标题高相似补充
-- 调试结果会写到 `data/reports/YYYY-MM-DD/recent_duplicate_matches.json`
+- 调试结果会写到 `data/reports/YYYY-MM/YYYY-MM-DD/recent_duplicate_matches.json`

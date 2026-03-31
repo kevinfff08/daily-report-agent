@@ -55,14 +55,14 @@ def test_load_recent_history_rehydrates_report_body_items(sample_date, sample_gi
         matcher = RecentDuplicateMatcher(store)
         history_date = sample_date - timedelta(days=1)
         store.save_json(
-            f"reports/{history_date.isoformat()}/items_index.json",
+            store.layer_relative_path("reports", history_date, "items_index.json"),
             [
                 {"index": 1, "source_item": sample_github_trending_item.model_dump(mode="json")},
                 {"index": 2, "source_item": sample_github_trending_item.model_dump(mode="json")},
             ],
         )
         store.save_json(
-            f"reports/{history_date.isoformat()}/overview_snippets.json",
+            store.layer_relative_path("reports", history_date, "overview_snippets.json"),
             [
                 {"index": 2, "title": sample_github_trending_item.title, "summary_markdown": "Kept in report"},
             ],

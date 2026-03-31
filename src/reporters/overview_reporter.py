@@ -127,7 +127,7 @@ class OverviewReporter:
             generation_time=datetime.now(),
         )
 
-        self.store.save_model(f"reports/{target_date.isoformat()}/overview_model.json", overview)
+        self.store.save_model(self.store.layer_relative_path("reports", target_date, "overview_model.json"), overview)
         self.store.save_report(target_date, "overview.md", full_markdown)
         self.store.save_output(target_date, "daily_report.md", full_markdown)
 
@@ -135,12 +135,15 @@ class OverviewReporter:
             {"index": idx, "source_item": item.model_dump(mode="json")}
             for idx, item in indexed_items
         ]
-        self.store.save_json(f"reports/{target_date.isoformat()}/items_index.json", items_index)
+        self.store.save_json(self.store.layer_relative_path("reports", target_date, "items_index.json"), items_index)
 
         overview_snippets = [
             snippet.model_dump(mode="json") for snippet in extract_overview_snippets(full_markdown)
         ]
-        self.store.save_json(f"reports/{target_date.isoformat()}/overview_snippets.json", overview_snippets)
+        self.store.save_json(
+            self.store.layer_relative_path("reports", target_date, "overview_snippets.json"),
+            overview_snippets,
+        )
 
         logger.info(
             "Overview report saved (%d items, %d sections, %d snippets)",

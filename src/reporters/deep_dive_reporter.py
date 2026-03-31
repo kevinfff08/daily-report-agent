@@ -117,7 +117,7 @@ class DeepDiveReporter:
 
         # Save
         self.store.save_model(
-            f"reports/{target_date.isoformat()}/deep_dive_model.json", report
+            self.store.layer_relative_path("reports", target_date, "deep_dive_model.json"), report
         )
         self.store.save_report(target_date, "deep_dive.md", full_markdown)
         output_path = self.store.save_output(target_date, "deep_dive_report.md", full_markdown)
