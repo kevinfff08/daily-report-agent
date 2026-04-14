@@ -40,6 +40,18 @@ _STATUS_OPTION_TO_SYMBOL = {
 }
 
 
+def _parse_optional_int_env(name: str) -> int | None:
+    """Parse optional positive integer env vars."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return None
+
+    value = int(raw)
+    if value <= 0:
+        raise ValueError(f"{name} must be a positive integer")
+    return value
+
+
 def _parse_status_argument(value: str) -> list[InterestStatus]:
     """Parse one or more CLI status tokens."""
     parsed: list[InterestStatus] = []
@@ -83,6 +95,8 @@ def _get_orchestrator() -> "DailyReportOrchestrator":
         api_key=api_key,
         llm_model=os.environ.get("LLM_MODEL"),
         base_url=base_url,
+        paper_max_chars=_parse_optional_int_env("PAPER_MAX_CHARS"),
+        deep_dive_max_tokens=_parse_optional_int_env("DEEP_DIVE_MAX_TOKENS"),
     )
 
 

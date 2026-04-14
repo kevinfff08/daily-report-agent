@@ -15,12 +15,15 @@ from src.models.source import SourceItem
 
 logger = get_logger("enrichers.paper")
 
-# Max characters to extract from PDF (~8000 words, covers most papers)
-_MAX_PDF_CHARS = 40_000
+# Default max characters to extract from PDF (~8000 words, covers most papers)
+_DEFAULT_MAX_PDF_CHARS = 40_000
 
 
 class PaperEnricher:
     """Enriches paper items by downloading and extracting full PDF text."""
+
+    def __init__(self, max_chars: int = _DEFAULT_MAX_PDF_CHARS):
+        self.max_chars = max_chars
 
     async def enrich(self, item: SourceItem) -> str:
         """Download paper PDF and extract text.
@@ -40,7 +43,7 @@ class PaperEnricher:
                 len(fallback_text),
                 item.title,
             )
-            return fallback_text[:_MAX_PDF_CHARS]
+            return fallback_text[: self.max_chars]
 
         logger.warning("No paper full text source available for: %s", item.title)
         return ""
@@ -76,8 +79,8 @@ class PaperEnricher:
             logger.warning("Empty text extracted from PDF: %s", item.title)
             return ""
 
-        logger.info("Extracted %d chars from PDF: %s", len(text[:_MAX_PDF_CHARS]), item.title)
-        return text[:_MAX_PDF_CHARS]
+        logger.info("Extracted %d chars from PDF: %s", len(text[: self.max_chars]), item.title)
+        return text[: self.max_chars]
 
     @staticmethod
     async def _download_pdf(url: str) -> bytes:
@@ -127,7 +130,7 @@ class PaperEnricher:
                     logger.debug("Fallback PDF extraction failed for %s via %s: %s", item.title, url, exc)
                     continue
                 if text.strip():
-                    return text[:_MAX_PDF_CHARS]
+                    return text[: self.max_chars]
                 continue
 
             html = result["content"].decode("utf-8", errors="ignore")
@@ -139,7 +142,7 @@ class PaperEnricher:
 
             text = self._html_to_text(html)
             if text:
-                return text[:_MAX_PDF_CHARS]
+                return text[: self.max_chars]
 
         return ""
 

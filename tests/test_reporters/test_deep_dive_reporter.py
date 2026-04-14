@@ -14,6 +14,16 @@ def deep_dive_reporter(mock_llm, store):
     return DeepDiveReporter(mock_llm, store)
 
 
+@pytest.fixture
+def deep_dive_reporter_configured(mock_llm, store):
+    return DeepDiveReporter(
+        mock_llm,
+        store,
+        deep_dive_max_tokens=12_000,
+        paper_max_chars=120_000,
+    )
+
+
 def _to_items_index(analyzed_item) -> list[dict]:
     """Convert an AnalyzedItem fixture to the items_index format used by generate()."""
     return [
@@ -141,6 +151,31 @@ class TestDeepDiveReporter:
 
         report_path = store.data_dir / "reports" / "2026-03-10" / "deep_dive.md"
         assert report_path.exists()
+
+    @pytest.mark.asyncio
+    async def test_generate_uses_configured_limits(
+        self,
+        deep_dive_reporter_configured,
+        mock_llm,
+        sample_analyzed_paper,
+    ):
+        mock_llm.generate_with_template.return_value = _PAPER_RESPONSE
+
+        with patch(
+            "src.reporters.deep_dive_reporter.enrich_item",
+            new_callable=AsyncMock,
+            return_value="Full paper text",
+        ) as mock_enrich:
+            await deep_dive_reporter_configured.generate(
+                date(2026, 3, 10), [1], _to_items_index(sample_analyzed_paper)
+            )
+
+        mock_enrich.assert_called_once_with(
+            sample_analyzed_paper.source_item,
+            paper_max_chars=120_000,
+        )
+        call_args = mock_llm.generate_with_template.call_args
+        assert call_args.kwargs["max_tokens"] == 12_000
 
     def test_select_template_paper(self):
         from src.models.source import SourceType

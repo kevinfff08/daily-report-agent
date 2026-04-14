@@ -16,6 +16,11 @@ def paper_enricher() -> PaperEnricher:
 
 
 @pytest.fixture
+def paper_enricher_custom_limit() -> PaperEnricher:
+    return PaperEnricher(max_chars=12_345)
+
+
+@pytest.fixture
 def arxiv_item() -> SourceItem:
     return SourceItem(
         id="arxiv:2603.12345",
@@ -153,3 +158,15 @@ class TestPaperEnricher:
              patch.object(paper_enricher, "_extract_text", return_value=long_text):
             result = await paper_enricher.enrich(arxiv_item)
         assert len(result) == 40_000
+
+    @pytest.mark.asyncio
+    async def test_enrich_uses_configured_max_chars(
+        self,
+        paper_enricher_custom_limit: PaperEnricher,
+        arxiv_item: SourceItem,
+    ) -> None:
+        long_text = "x" * 100_000
+        with patch.object(paper_enricher_custom_limit, "_download_pdf", new_callable=AsyncMock, return_value=b"pdf"), \
+             patch.object(paper_enricher_custom_limit, "_extract_text", return_value=long_text):
+            result = await paper_enricher_custom_limit.enrich(arxiv_item)
+        assert len(result) == 12_345

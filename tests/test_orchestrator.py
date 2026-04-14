@@ -101,6 +101,28 @@ def test_generate_deep_dive_registers_entries_local_tmp(sample_arxiv_item) -> No
         shutil.rmtree(temp_path, ignore_errors=True)
 
 
+def test_orchestrator_uses_provider_specific_deep_dive_defaults() -> None:
+    temp_path = _workspace_temp_path()
+    try:
+        anthropic_orchestrator = DailyReportOrchestrator(
+            data_dir=str(temp_path / "anthropic-data"),
+            config_dir=str(temp_path / "config"),
+            llm_provider="anthropic",
+        )
+        openai_orchestrator = DailyReportOrchestrator(
+            data_dir=str(temp_path / "openai-data"),
+            config_dir=str(temp_path / "config"),
+            llm_provider="openai",
+        )
+
+        assert anthropic_orchestrator.paper_max_chars == 40_000
+        assert anthropic_orchestrator.deep_dive_max_tokens == 8192
+        assert openai_orchestrator.paper_max_chars == 120_000
+        assert openai_orchestrator.deep_dive_max_tokens == 12_000
+    finally:
+        shutil.rmtree(temp_path, ignore_errors=True)
+
+
 """
 def test_generate_overview_downranks_recent_duplicates_and_saves_debug_json(
     tmp_path: Path,

@@ -42,9 +42,17 @@ _SOCIAL_HEADINGS = [
 class DeepDiveReporter:
     """Generates the Stage 2 deep dive report for selected items."""
 
-    def __init__(self, llm: LLMClient, store: LocalStore):
+    def __init__(
+        self,
+        llm: LLMClient,
+        store: LocalStore,
+        deep_dive_max_tokens: int = 8192,
+        paper_max_chars: int = 40_000,
+    ):
         self.llm = llm
         self.store = store
+        self.deep_dive_max_tokens = deep_dive_max_tokens
+        self.paper_max_chars = paper_max_chars
 
     async def generate(
         self,
@@ -130,7 +138,7 @@ class DeepDiveReporter:
         logger.info("Deep diving into [%03d] %s (%s)", index, item.title, item.source_type.value)
 
         # Enrich content before LLM analysis
-        enriched_content = await enrich_item(item)
+        enriched_content = await enrich_item(item, paper_max_chars=self.paper_max_chars)
         logger.info(
             "Enriched content: %d chars for [%03d] %s",
             len(enriched_content), index, item.title,
@@ -153,7 +161,7 @@ class DeepDiveReporter:
         markdown = self.llm.generate_with_template(
             template_name,
             variables,
-            max_tokens=8192,
+            max_tokens=self.deep_dive_max_tokens,
             temperature=0.3,
         )
         markdown = normalize_markdown_math(markdown)

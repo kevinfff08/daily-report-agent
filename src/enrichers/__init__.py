@@ -28,13 +28,14 @@ _WEB_EXTRACT_TYPES = {SourceType.HACKER_NEWS, SourceType.GITHUB_TRENDING}
 _SKIP_TYPES = {SourceType.YOUTUBE_VIDEO, SourceType.BILIBILI_VIDEO}
 
 
-async def enrich_item(item: SourceItem) -> str:
+async def enrich_item(item: SourceItem, paper_max_chars: int | None = None) -> str:
     """Enrich item content for deep dive analysis.
 
     Returns enriched text to pass to LLM. Falls back to content_snippet on failure.
     """
     if item.source_type in _PAPER_TYPES:
-        enriched = await _paper_enricher.enrich(item)
+        paper_enricher = _paper_enricher if paper_max_chars is None else PaperEnricher(max_chars=paper_max_chars)
+        enriched = await paper_enricher.enrich(item)
         if enriched:
             return enriched
 

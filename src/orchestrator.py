@@ -30,6 +30,15 @@ from src.storage.local_store import LocalStore
 
 logger = get_logger("orchestrator")
 
+_DEFAULT_PAPER_MAX_CHARS = {
+    "anthropic": 40_000,
+    "openai": 120_000,
+}
+_DEFAULT_DEEP_DIVE_MAX_TOKENS = {
+    "anthropic": 8192,
+    "openai": 12_000,
+}
+
 
 class DailyReportOrchestrator:
     """Main workflow engine for the daily report system.
@@ -47,6 +56,8 @@ class DailyReportOrchestrator:
         api_key: str | None = None,
         llm_model: str | None = None,
         base_url: str | None = None,
+        paper_max_chars: int | None = None,
+        deep_dive_max_tokens: int | None = None,
         registry_manager: DeepDiveRegistryManager | None = None,
     ):
         self.store = LocalStore(data_dir)
@@ -55,6 +66,10 @@ class DailyReportOrchestrator:
             api_key=api_key,
             model=llm_model,
             base_url=base_url,
+        )
+        self.paper_max_chars = paper_max_chars or _DEFAULT_PAPER_MAX_CHARS[self.llm.provider]
+        self.deep_dive_max_tokens = (
+            deep_dive_max_tokens or _DEFAULT_DEEP_DIVE_MAX_TOKENS[self.llm.provider]
         )
         self.config = self._load_config(config_dir)
 
@@ -74,13 +89,23 @@ class DailyReportOrchestrator:
         self.item_filter = ItemFilter()
         self.recent_duplicate_matcher = RecentDuplicateMatcher(self.store)
         self.overview_reporter = OverviewReporter(self.llm, self.store)
-        self.deep_dive_reporter = DeepDiveReporter(self.llm, self.store)
+        self.deep_dive_reporter = DeepDiveReporter(
+            self.llm,
+            self.store,
+            deep_dive_max_tokens=self.deep_dive_max_tokens,
+            paper_max_chars=self.paper_max_chars,
+        )
         self.registry_manager = registry_manager or DeepDiveRegistryManager(
             self.llm,
             local_store=self.store,
         )
 
-        logger.info("Orchestrator initialized (model=%s)", self.llm.model)
+        logger.info(
+            "Orchestrator initialized (model=%s, paper_max_chars=%d, deep_dive_max_tokens=%d)",
+            self.llm.model,
+            self.paper_max_chars,
+            self.deep_dive_max_tokens,
+        )
 
     def _load_config(self, config_dir: str) -> SourceConfig:
         """Load source configuration from YAML."""

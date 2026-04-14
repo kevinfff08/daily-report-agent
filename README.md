@@ -56,6 +56,16 @@ ANTHROPIC_API_KEY=sk-ant-...
 # LLM_PROXY_URL=http://localhost:8317
 # LLM_MODEL=gpt-4.1-mini
 
+# Optional: deep-dive paper input length limit (characters)
+# - Anthropic default: 40000
+# - OpenAI default: 120000
+# PAPER_MAX_CHARS=120000
+
+# Optional: deep-dive output token limit
+# - Anthropic default: 8192
+# - OpenAI default: 12000
+# DEEP_DIVE_MAX_TOKENS=12000
+
 # Data source keys
 YOUTUBE_API_KEY=AIza...
 TAVILY_API_KEY=tvly-...
@@ -74,6 +84,22 @@ LLM_PROXY_URL=http://localhost:8317
 ```
 
 OpenAI 适配会自动把 `LLM_PROXY_URL` 规范到 `/v1`，例如 `http://localhost:8317` 会自动变成 `http://localhost:8317/v1`。
+
+### Deep Dive 长度参数
+
+可选参数：
+
+- `PAPER_MAX_CHARS`
+  控制 deep-dive 中论文正文输入给 LLM 前的字符上限。PDF 抽取文本和论文页回退文本都会按这个上限截断。
+- `DEEP_DIVE_MAX_TOKENS`
+  控制 deep-dive 单条条目生成时传给 LLM 的输出 token 上限。
+
+默认值：
+
+- Anthropic：`PAPER_MAX_CHARS=40000`，`DEEP_DIVE_MAX_TOKENS=8192`
+- OpenAI：`PAPER_MAX_CHARS=120000`，`DEEP_DIVE_MAX_TOKENS=12000`
+
+如果你在 `.env` 里显式设置了这两个参数，则会覆盖 provider 默认值，并且对 Anthropic / OpenAI 通用生效。
 
 ### `config/sources.yaml`
 

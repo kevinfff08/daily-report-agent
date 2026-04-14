@@ -87,6 +87,21 @@ class TestCLI:
             assert kwargs["llm_provider"] == "anthropic"
             assert kwargs["api_key"] == "anthropic-test-key"
 
+    def test_get_orchestrator_passes_deep_dive_limits(self, monkeypatch):
+        monkeypatch.setenv("LLM_PROVIDER", "openai")
+        monkeypatch.setenv("OPENAI_API_KEY", "openai-test-key")
+        monkeypatch.setenv("PAPER_MAX_CHARS", "150000")
+        monkeypatch.setenv("DEEP_DIVE_MAX_TOKENS", "16000")
+
+        with patch("src.orchestrator.DailyReportOrchestrator") as mock_orch_cls:
+            mock_orch_cls.return_value = MagicMock()
+            from src.cli import _get_orchestrator
+            _ = _get_orchestrator()
+
+            kwargs = mock_orch_cls.call_args.kwargs
+            assert kwargs["paper_max_chars"] == 150000
+            assert kwargs["deep_dive_max_tokens"] == 16000
+
     def test_help(self):
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
