@@ -82,6 +82,8 @@ def _get_orchestrator() -> "DailyReportOrchestrator":
     llm_mode = os.environ.get("LLM_MODE", "api-key")
     if llm_provider == "openai":
         api_key = os.environ.get("OPENAI_API_KEY", "")
+    elif llm_provider == "deepseek":
+        api_key = os.environ.get("DEEPSEEK_API_KEY", "")
     else:
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     base_url = None

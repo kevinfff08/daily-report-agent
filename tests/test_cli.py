@@ -73,6 +73,21 @@ class TestCLI:
             assert kwargs["llm_provider"] == "openai"
             assert kwargs["api_key"] == "openai-test-key"
 
+    def test_get_orchestrator_uses_deepseek_key(self, monkeypatch):
+        monkeypatch.setenv("LLM_PROVIDER", "deepseek")
+        monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek-test-key")
+        monkeypatch.setenv("OPENAI_API_KEY", "openai-should-not-be-used")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-should-not-be-used")
+
+        with patch("src.orchestrator.DailyReportOrchestrator") as mock_orch_cls:
+            mock_orch_cls.return_value = MagicMock()
+            from src.cli import _get_orchestrator
+            _ = _get_orchestrator()
+
+            kwargs = mock_orch_cls.call_args.kwargs
+            assert kwargs["llm_provider"] == "deepseek"
+            assert kwargs["api_key"] == "deepseek-test-key"
+
     def test_get_orchestrator_defaults_to_anthropic(self, monkeypatch):
         monkeypatch.delenv("LLM_PROVIDER", raising=False)
         monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-test-key")

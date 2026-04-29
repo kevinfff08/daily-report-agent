@@ -1,4 +1,4 @@
-"""LLM client wrapper supporting Anthropic and OpenAI APIs."""
+"""LLM client wrapper supporting Anthropic, OpenAI, and DeepSeek APIs."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ _MAX_RETRIES = 5
 _RETRY_BASE_DELAY = 2.0  # seconds
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504, 529}
 _OPENAI_BASE_URL = "https://api.openai.com/v1"
+_DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 _OPENAI_TIMEOUT_SECONDS = 180.0
 
 
@@ -28,7 +29,16 @@ def _default_model(provider: str) -> str:
     """Return provider-specific default model."""
     if provider == "openai":
         return "gpt-4.1-mini"
+    if provider == "deepseek":
+        return "deepseek-v4-flash"
     return "claude-sonnet-4-20250514"
+
+
+def _default_base_url(provider: str) -> str:
+    """Return provider-specific default base URL for HTTP clients."""
+    if provider == "deepseek":
+        return _DEEPSEEK_BASE_URL
+    return _OPENAI_BASE_URL
 
 
 def _normalize_openai_base_url(base_url: str) -> str:
@@ -44,13 +54,13 @@ class LLMClient:
 
     def __init__(
         self,
-        provider: Literal["anthropic", "openai"] = "anthropic",
+        provider: Literal["anthropic", "openai", "deepseek"] = "anthropic",
         api_key: str | None = None,
         model: str | None = None,
         base_url: str | None = None,
     ):
         self.provider = provider.lower()
-        if self.provider not in {"anthropic", "openai"}:
+        if self.provider not in {"anthropic", "openai", "deepseek"}:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
         # In proxy mode (base_url set), use a placeholder key if none provided
@@ -59,7 +69,7 @@ class LLMClient:
         else:
             self.api_key = api_key or ""
         self.model = model or _default_model(self.provider)
-        if self.provider == "openai" and base_url:
+        if self.provider in {"openai", "deepseek"} and base_url:
             self.base_url = _normalize_openai_base_url(base_url)
         else:
             self.base_url = base_url
@@ -77,7 +87,7 @@ class LLMClient:
                 headers = {"Content-Type": "application/json"}
                 if self.api_key:
                     headers["Authorization"] = f"Bearer {self.api_key}"
-                resolved_base_url = self.base_url or _OPENAI_BASE_URL
+                resolved_base_url = self.base_url or _default_base_url(self.provider)
                 resolved_base_url = _normalize_openai_base_url(resolved_base_url)
                 self._client = httpx.Client(
                     base_url=resolved_base_url.rstrip("/") + "/",
@@ -105,7 +115,7 @@ class LLMClient:
             try:
                 if self.provider == "anthropic":
                     return self._generate_anthropic(prompt, system, max_tokens, temperature, t0)
-                return self._generate_openai(prompt, system, max_tokens, temperature, t0)
+                return self._generate_openai_compatible(prompt, system, max_tokens, temperature, t0)
             except APIStatusError as e:
                 last_err = e
                 status_code = e.status_code
@@ -161,7 +171,7 @@ class LLMClient:
         )
         return text
 
-    def _generate_openai(
+    def _generate_openai_compatible(
         self,
         prompt: str,
         system: str,
@@ -169,7 +179,7 @@ class LLMClient:
         temperature: float,
         t0: float,
     ) -> str:
-        """Generate text via OpenAI Chat Completions API."""
+        """Generate text via an OpenAI-compatible Chat Completions API."""
         client = self.client
 
         messages: list[dict[str, str]] = []
@@ -177,14 +187,20 @@ class LLMClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
+        request_body: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if self.provider == "deepseek":
+            # Keep current text/JSON workflows stable by opting out of DeepSeek's
+            # default thinking mode unless a future dedicated feature enables it.
+            request_body["thinking"] = {"type": "disabled"}
+
         response = client.post(
             "chat/completions",
-            json={
-                "model": self.model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            },
+            json=request_body,
         )
         response.raise_for_status()
 
@@ -201,7 +217,8 @@ class LLMClient:
         usage = data.get("usage", {})
         latency = time.time() - t0
         logger.debug(
-            "LLM response: provider=openai, latency=%.1fs, input=%s, output=%s, stop=%s",
+            "LLM response: provider=%s, latency=%.1fs, input=%s, output=%s, stop=%s",
+            self.provider,
             latency,
             usage.get("prompt_tokens", "?"),
             usage.get("completion_tokens", "?"),

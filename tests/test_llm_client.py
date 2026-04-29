@@ -134,7 +134,7 @@ class TestLLMClientAnthropicRetry:
 
 
 class TestLLMClientOpenAI:
-    """Test OpenAI provider behavior."""
+    """Test OpenAI-compatible provider behavior."""
 
     def test_openai_default_base_url(self) -> None:
         """OpenAI client should target the /v1 base URL by default."""
@@ -215,3 +215,45 @@ class TestLLMClientOpenAI:
         """OpenAI provider should use provider-specific default model."""
         client = LLMClient(provider="openai", api_key="test-key")
         assert client.model == "gpt-4.1-mini"
+
+
+class TestLLMClientDeepSeek:
+    """Test DeepSeek provider behavior."""
+
+    def test_deepseek_default_base_url(self) -> None:
+        """DeepSeek client should target the official /v1 base URL by default."""
+        client = LLMClient(provider="deepseek", api_key="test-key")
+        deepseek_client = client.client
+        assert isinstance(deepseek_client, httpx.Client)
+        assert str(deepseek_client.base_url) == "https://api.deepseek.com/v1/"
+        deepseek_client.close()
+
+    def test_deepseek_base_url_is_normalized_to_v1(self) -> None:
+        """DeepSeek base URL without /v1 should be normalized automatically."""
+        client = LLMClient(
+            provider="deepseek",
+            api_key="test-key",
+            base_url="https://api.deepseek.com",
+        )
+        deepseek_client = client.client
+        assert isinstance(deepseek_client, httpx.Client)
+        assert str(deepseek_client.base_url) == "https://api.deepseek.com/v1/"
+        deepseek_client.close()
+
+    def test_deepseek_request_disables_thinking_by_default(self) -> None:
+        """DeepSeek requests should opt out of default thinking mode."""
+        client = LLMClient(provider="deepseek", api_key="test-key", model="deepseek-v4-flash")
+        mock_post = MagicMock(return_value=_make_openai_response(text="ok"))
+        with patch.object(client, "_client", create=True) as mock_deepseek:
+            mock_deepseek.post = mock_post
+            result = client.generate("test prompt")
+
+        assert result == "ok"
+        assert mock_post.call_count == 1
+        request_json = mock_post.call_args.kwargs["json"]
+        assert request_json["thinking"] == {"type": "disabled"}
+
+    def test_deepseek_default_model(self) -> None:
+        """DeepSeek provider should use provider-specific default model."""
+        client = LLMClient(provider="deepseek", api_key="test-key")
+        assert client.model == "deepseek-v4-flash"

@@ -114,11 +114,18 @@ def test_orchestrator_uses_provider_specific_deep_dive_defaults() -> None:
             config_dir=str(temp_path / "config"),
             llm_provider="openai",
         )
+        deepseek_orchestrator = DailyReportOrchestrator(
+            data_dir=str(temp_path / "deepseek-data"),
+            config_dir=str(temp_path / "config"),
+            llm_provider="deepseek",
+        )
 
         assert anthropic_orchestrator.paper_max_chars == 40_000
         assert anthropic_orchestrator.deep_dive_max_tokens == 8192
         assert openai_orchestrator.paper_max_chars == 120_000
         assert openai_orchestrator.deep_dive_max_tokens == 12_000
+        assert deepseek_orchestrator.paper_max_chars == 120_000
+        assert deepseek_orchestrator.deep_dive_max_tokens == 12_000
     finally:
         shutil.rmtree(temp_path, ignore_errors=True)
 
