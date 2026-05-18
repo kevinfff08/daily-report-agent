@@ -13,6 +13,7 @@ from src.llm.client import LLMClient
 from src.logging_config import get_logger
 from src.models.report import DailyOverview, IndexEntry, ReportSection
 from src.models.source import SourceItem, SourceType
+from src.reporters.html_renderer import render_html_report
 from src.storage.local_store import LocalStore
 from src.utils.markdown_math import normalize_markdown_math
 from src.utils.overview_snippets import extract_overview_snippets
@@ -130,6 +131,15 @@ class OverviewReporter:
         self.store.save_model(self.store.layer_relative_path("reports", target_date, "overview_model.json"), overview)
         self.store.save_report(target_date, "overview.md", full_markdown)
         self.store.save_output(target_date, "daily_report.md", full_markdown)
+
+        full_html = render_html_report(
+            full_markdown,
+            report_kind="overview",
+            target_date=target_date,
+            source_filename="daily_report.md",
+        )
+        self.store.save_report(target_date, "overview.html", full_html)
+        self.store.save_output(target_date, "daily_report.html", full_html)
 
         items_index = [
             {"index": idx, "source_item": item.model_dump(mode="json")}

@@ -14,6 +14,7 @@ from src.llm.client import LLMClient
 from src.logging_config import get_logger
 from src.models.report import DeepAnalysis, DeepDiveReport, DeepSection
 from src.models.source import SourceItem, SourceType
+from src.reporters.html_renderer import render_html_report
 from src.storage.local_store import LocalStore
 from src.utils.markdown_math import normalize_markdown_math
 
@@ -129,6 +130,15 @@ class DeepDiveReporter:
         )
         self.store.save_report(target_date, "deep_dive.md", full_markdown)
         output_path = self.store.save_output(target_date, "deep_dive_report.md", full_markdown)
+
+        full_html = render_html_report(
+            full_markdown,
+            report_kind="deep_dive",
+            target_date=target_date,
+            source_filename="deep_dive_report.md",
+        )
+        self.store.save_report(target_date, "deep_dive.html", full_html)
+        self.store.save_output(target_date, "deep_dive_report.html", full_html)
 
         logger.info("Deep dive report saved to %s", output_path)
         return report, full_markdown

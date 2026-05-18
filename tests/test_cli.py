@@ -176,6 +176,26 @@ class TestCLI:
         assert result.exit_code == 0
         assert "Pipeline complete" in result.output
 
+    def test_html_command_renders_existing_reports(self, tmp_path, monkeypatch):
+        output_dir = tmp_path / "output" / "2026-03" / "2026-03-10"
+        output_dir.mkdir(parents=True)
+        (output_dir / "daily_report.md").write_text("# Daily\n\n## Section", encoding="utf-8")
+
+        data_dir = tmp_path / "data"
+        report_dir = data_dir / "reports" / "2026-03" / "2026-03-10"
+        report_dir.mkdir(parents=True)
+        (report_dir / "overview.md").write_text("# Daily\n\n## Section", encoding="utf-8")
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("DATA_DIR", str(data_dir))
+
+        result = runner.invoke(app, ["html", "--date", "2026-03-10"])
+
+        assert result.exit_code == 0
+        assert "Rendered 2 HTML files" in result.output
+        assert (output_dir / "daily_report.html").exists()
+        assert (report_dir / "overview.html").exists()
+
     def test_status_command(self, mock_orchestrator):
         with patch("src.cli._get_orchestrator", return_value=mock_orchestrator):
             result = runner.invoke(app, ["status"])

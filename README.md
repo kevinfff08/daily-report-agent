@@ -1,8 +1,8 @@
 # DailyReport — 每日 AI/ML 情报聚合系统
 
 PhD-level 每日情报工具，监控 arXiv、顶会/Blog、社区讨论、开源项目和新产品发布，生成两阶段报告：
-- Stage 1：`daily_report.md`，适合 10-15 分钟快速浏览
-- Stage 2：`deep_dive_report.md`，针对你手选条目的深度分析
+- Stage 1：`daily_report.md` / `daily_report.html`，适合 10-15 分钟快速浏览
+- Stage 2：`deep_dive_report.md` / `deep_dive_report.html`，针对你手选条目的深度分析
 
 ## 功能概览
 
@@ -10,6 +10,7 @@ PhD-level 每日情报工具，监控 arXiv、顶会/Blog、社区讨论、开�
 - 两阶段报告流程：先总览，再按编号深挖
 - OpenAI / Anthropic / DeepSeek 三适配，支持 API Key，且保留现有 CLIProxy 转接能力
 - Markdown 数学公式规范化，便于后续 LaTeX / PDF 链路使用
+- Markdown 与 HTML 双格式输出；HTML 报告内置阅读模板，并通过 MathJax 渲染行内和块级公式
 - 相邻 3 天概览正文自动做跨天重复降权，减少连续几天反复出现相同条目
 - 深度分析完成后自动登记到长期台账
 - 长期台账支持命令行展示、状态维护和历史条目检索
@@ -138,6 +139,11 @@ python -m src.cli run
 # 生成 Stage 2 深度分析
 python -m src.cli deep-dive --items "1,3,15"
 python -m src.cli deep-dive --date 2026-03-25 --items "1,3,15"
+
+# 从已有 Markdown 生成 HTML（不调用 LLM）
+python -m src.cli html --date 2026-03-25
+python -m src.cli html --start-date 2026-03-01 --end-date 2026-05-31
+python -m src.cli html --all
 ```
 
 ## 长期台账
@@ -213,16 +219,20 @@ data/
   analyzed/YYYY-MM/YYYY-MM-DD/           # 分析结果
   reports/YYYY-MM/YYYY-MM-DD/
     overview.md                  # Stage 1 markdown
+    overview.html                # Stage 1 HTML
     overview_model.json          # Stage 1 结构化结果
     items_index.json             # 候选条目索引
     overview_snippets.json       # 已入选条目的简版摘要
     recent_duplicate_matches.json # 跨天重复命中调试信息
     deep_dive.md                 # Stage 2 markdown 数据
+    deep_dive.html               # Stage 2 HTML
 
 output/
   YYYY-MM/YYYY-MM-DD/
     daily_report.md              # 最终概览报告
+    daily_report.html            # 最终概览 HTML 报告
     deep_dive_report.md          # 最终深度分析报告
+    deep_dive_report.html        # 最终深度分析 HTML 报告
 
 logs/
   YYYY-MM/YYYY-MM-DD.log
@@ -238,7 +248,7 @@ records/
 # 1. 跑当日概览
 python -m src.cli run
 
-# 2. 阅读 output/YYYY-MM/YYYY-MM-DD/daily_report.md，挑选编号
+# 2. 阅读 output/YYYY-MM/YYYY-MM-DD/daily_report.html，挑选编号
 
 # 3. 生成深度分析
 python -m src.cli deep-dive --items "1,5,12"
@@ -278,6 +288,7 @@ src/
 
 其中：
 - `reporters/overview_reporter.py` 负责生成 `daily_report.md` 和 `overview_snippets.json`
+- `reporters/html_renderer.py` 负责把报告 Markdown 渲染为独立 HTML，并为历史报告补生成 HTML
 - `filters/recent_duplicates.py` 负责恢复近 3 天正文条目并计算跨天重复 penalty
 - `reporters/deep_dive_reporter.py` 负责生成 `deep_dive_report.md`
 - `registry/manager.py` 负责深度分析登记和历史条目检索

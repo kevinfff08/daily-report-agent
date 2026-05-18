@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 from datetime import date
+from pathlib import Path
 
 import typer
 from dotenv import load_dotenv
@@ -159,6 +160,7 @@ def report(
     overview, _ = asyncio.run(orch.generate_overview(d))
     console.print(f"\n[bold green]Report generated: {overview.total_items} items[/bold green]")
     console.print(f"Output: {orch.store.output_path(d, 'daily_report.md')}")
+    console.print(f"HTML: {orch.store.output_path(d, 'daily_report.html')}")
 
 
 @app.command(name="deep-dive")
@@ -188,6 +190,7 @@ def deep_dive(
     report_model, _ = asyncio.run(orch.generate_deep_dive(d, indices))
     console.print(f"\n[bold green]Deep dive complete: {len(report_model.analyses)} analyses[/bold green]")
     console.print(f"Output: {orch.store.output_path(d, 'deep_dive_report.md')}")
+    console.print(f"HTML: {orch.store.output_path(d, 'deep_dive_report.html')}")
 
 
 @app.command()
@@ -202,6 +205,59 @@ def run(
     output_path = asyncio.run(orch.run(d))
     console.print("\n[bold green]Pipeline complete![/bold green]")
     console.print(f"Report: {output_path}")
+    console.print(f"HTML: {output_path.with_suffix('.html')}")
+
+
+@app.command(name="html")
+def html_reports(
+    target_date: str = typer.Option(None, "--date", "-d", help="Only render one date (YYYY-MM-DD)"),
+    start_date: str = typer.Option(None, "--start-date", help="Start date for batch rendering (YYYY-MM-DD)"),
+    end_date: str = typer.Option(None, "--end-date", help="End date for batch rendering (YYYY-MM-DD)"),
+    all_dates: bool = typer.Option(False, "--all", help="Render all existing markdown reports"),
+) -> None:
+    """Render HTML companions for existing markdown reports without LLM calls."""
+    from src.reporters.html_renderer import (
+        render_existing_data_report_html,
+        render_existing_output_html,
+    )
+
+    if target_date and (start_date or end_date or all_dates):
+        console.print("[red]Use either --date or a batch range/--all, not both.[/red]")
+        raise typer.Exit(1)
+
+    start: date | None
+    end: date | None
+    if target_date:
+        start = end = _parse_date(target_date)
+    elif all_dates or start_date or end_date:
+        start = _parse_date(start_date) if start_date else None
+        end = _parse_date(end_date) if end_date else None
+    else:
+        start = end = date.today()
+
+    if start and end and start > end:
+        console.print("[red]--start-date must be earlier than or equal to --end-date.[/red]")
+        raise typer.Exit(1)
+
+    rendered_output = render_existing_output_html(
+        Path("output"),
+        start_date=start,
+        end_date=end,
+    )
+    rendered_data = render_existing_data_report_html(
+        os.environ.get("DATA_DIR", "data"),
+        start_date=start,
+        end_date=end,
+    )
+    rendered = rendered_output + rendered_data
+
+    if not rendered:
+        console.print("[yellow]No markdown reports found for the requested date range.[/yellow]")
+        return
+
+    console.print(f"[bold green]Rendered {len(rendered)} HTML files[/bold green]")
+    console.print(f"Output HTML files: {len(rendered_output)}")
+    console.print(f"Data report HTML files: {len(rendered_data)}")
 
 
 @app.command()

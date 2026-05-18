@@ -149,8 +149,14 @@ class TestDeepDiveReporter:
                 date(2026, 3, 10), [1], _to_items_index(sample_analyzed_paper)
             )
 
-        report_path = store.data_dir / "reports" / "2026-03-10" / "deep_dive.md"
+        report_path = store.data_dir / "reports" / "2026-03" / "2026-03-10" / "deep_dive.md"
         assert report_path.exists()
+
+        html_path = store.data_dir / "reports" / "2026-03" / "2026-03-10" / "deep_dive.html"
+        assert html_path.exists()
+        html = html_path.read_text(encoding="utf-8")
+        assert "MathJax-script" in html
+        assert "Background text based on full paper" in html
 
     @pytest.mark.asyncio
     async def test_generate_uses_configured_limits(

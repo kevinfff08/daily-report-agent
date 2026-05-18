@@ -57,14 +57,20 @@ class TestOverviewReporter:
         )
         await overview_reporter.generate(date(2026, 3, 10), [sample_arxiv_item])
 
-        report_path = store.data_dir / "reports" / "2026-03-10" / "overview.md"
+        report_path = store.data_dir / "reports" / "2026-03" / "2026-03-10" / "overview.md"
         assert report_path.exists()
         content = report_path.read_text(encoding="utf-8")
         assert "LLM report content" in content
 
-        snippets_path = store.data_dir / "reports" / "2026-03-10" / "overview_snippets.json"
+        html_path = store.data_dir / "reports" / "2026-03" / "2026-03-10" / "overview.html"
+        assert html_path.exists()
+        html = html_path.read_text(encoding="utf-8")
+        assert "MathJax-script" in html
+        assert "LLM report content" in html
+
+        snippets_path = store.data_dir / "reports" / "2026-03" / "2026-03-10" / "overview_snippets.json"
         assert snippets_path.exists()
-        snippets = store.load_json("reports/2026-03-10/overview_snippets.json")
+        snippets = store.load_json("reports/2026-03/2026-03-10/overview_snippets.json")
         assert isinstance(snippets, list)
         assert snippets[0]["index"] == 1
         assert "LLM report content" in snippets[0]["summary_markdown"]
