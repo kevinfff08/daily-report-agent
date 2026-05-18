@@ -175,3 +175,34 @@ class TestRegistryStore:
         assert "### SUM-20260325-001" in content
         assert "<!-- summary-start -->" in content
         assert "摘要正文" in content
+        html_path = tmp_path / "records" / "2026-03-record.html"
+        assert html_path.exists()
+        html_content = html_path.read_text(encoding="utf-8")
+        assert 'id="summaryView"' in html_content
+        assert 'class="summary-table"' in html_content
+        assert 'data-view="summary"' in html_content
+        assert 'id="20260325-001"' in html_content
+        assert '"sourceFilename": "2026-03-record.md"' in html_content
+        assert '"sourceMarkdown":' in html_content
+        assert "markdownFile" not in html_content
+        assert "showOpenFilePicker" not in html_content
+
+    def test_save_month_entries_cleans_accidental_report_sections(self, tmp_path: Path) -> None:
+        store = _make_store(tmp_path)
+        entry = RegistryEntry(
+            date=date(2026, 5, 15),
+            record_id="20260515-049",
+            title="Raindrop Workshop",
+            keywords=["agent debugging"],
+            attribute=RegistryAttribute.PROJECT,
+            summary_ref="SUM-20260515-049",
+            summary_markdown="Item summary.\n\n## 社区热点\n\nShould be removed.",
+            source_index=49,
+        )
+
+        path = store.upsert_month_entries(date(2026, 5, 15), [entry])
+        content = path.read_text(encoding="utf-8")
+
+        assert "Item summary." in content
+        assert "## 社区热点" not in content
+        assert "Should be removed." not in content

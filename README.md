@@ -151,6 +151,7 @@ python -m src.cli html --all
 ### 文件组织
 
 - 实际台账按月存储：`records/YYYY-MM-record.md`
+- HTML 阅读版同步存储：`records/YYYY-MM-record.html`
 - 示例文件：`records/2026-03-record.example.md`
 - 实际台账被 `.gitignore` 忽略，示例文件保留在仓库中用于公开展示格式
 
@@ -169,6 +170,7 @@ python -m src.cli html --all
 - `记录ID` 固定为 `YYYYMMDD-XXX`
 - `摘要` 列只保存稳定引用号，例如 `SUM-20260325-001`
 - 完整摘要放在同一月文件下半部分的“摘要附录”中
+- HTML 版提供汇总表、条目详情、搜索、属性筛选和关注状态勾选；勾选后可点击“写回 Markdown”按同名 Markdown 文件生成更新版
 - 自动同步只覆盖自动字段：标题、关键词、属性、摘要
 - 你的手动字段 `我的关注状态` 会被保留
 
@@ -197,6 +199,11 @@ python -m src.cli registry mark --id 20260325-001 --status star,question --mode 
 python -m src.cli registry mark --id 20260325-001 --status check
 python -m src.cli registry mark --id 20260325-001 --status none
 python -m src.cli registry mark --id 20260325-001 --status star --mode remove
+
+# 生成/修复台账 HTML
+python -m src.cli registry html --month 2026-03
+python -m src.cli registry html --all
+python -m src.cli registry repair
 
 # 检索最接近的历史条目
 python -m src.cli registry find --query "multi-agent safety"

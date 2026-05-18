@@ -46,6 +46,9 @@ def extract_overview_snippets(markdown: str) -> list[OverviewSnippet]:
         if line in _INDEX_SECTION_MARKERS:
             flush_current()
             break
+        if current_index is not None and line.startswith("## "):
+            flush_current()
+            continue
 
         match = _ITEM_HEADING_RE.match(line)
         if match:

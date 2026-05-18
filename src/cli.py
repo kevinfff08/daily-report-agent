@@ -381,6 +381,41 @@ def registry_mark(
     console.print(f"[bold green]已更新[/bold green] {record_id} -> {display_status}")
 
 
+@registry_app.command("html")
+def registry_html(
+    month: str = typer.Option(None, "--month", "-m", help="只生成指定月份台账 HTML，例如 2026-05"),
+    all_months: bool = typer.Option(False, "--all", help="生成全部已有月份台账 HTML"),
+) -> None:
+    """Render HTML companions for registry Markdown files."""
+    if month and all_months:
+        console.print("[red]--month 和 --all 不能同时使用[/red]")
+        raise typer.Exit(1)
+
+    store = _get_registry_store()
+    if all_months or not month:
+        rendered = store.render_all_html()
+    else:
+        rendered = [store.render_month_html(month)]
+
+    if not rendered:
+        console.print("[yellow]没有可生成的台账 HTML。[/yellow]")
+        return
+
+    console.print(f"[bold green]已生成 {len(rendered)} 个台账 HTML[/bold green]")
+    for path in rendered:
+        console.print(str(path))
+
+
+@registry_app.command("repair")
+def registry_repair() -> None:
+    """Clean summary appendix blocks and regenerate registry HTML files."""
+    store = _get_registry_store()
+    repaired = store.repair_summary_appendices()
+    console.print(f"[bold green]已修复 {len(repaired)} 个台账文件[/bold green]")
+    for path in repaired:
+        console.print(str(path))
+
+
 @registry_app.command("find")
 def registry_find(
     query: str = typer.Option(..., "--query", "-q", help="用于匹配条目的查询文本"),

@@ -17,6 +17,7 @@ _SUMMARY_LINK_RE = re.compile(r"\[(SUM-\d{8}-\d{3})\]\(#sum-\d{8}-\d{3}\)")
 _SUMMARY_START_MARKER = "<!-- summary-start -->"
 _SUMMARY_END_MARKER = "<!-- summary-end -->"
 _SOURCE_INDEX_RE = re.compile(r"<!-- source_index: (\d+) -->")
+_REPORT_HEADING_IN_SUMMARY_RE = re.compile(r"^#{1,2}\s+.+$")
 
 
 class RegistryStore:
@@ -88,7 +89,10 @@ class RegistryStore:
         """Rewrite a monthly registry file using canonical formatting."""
         year_month = target_date.strftime("%Y-%m")
         path = self._ensure_month_file(year_month)
-        sorted_entries = sorted(entries, key=lambda item: (-item.date.toordinal(), item.record_id))
+        sorted_entries = sorted(
+            (self._clean_entry_summary(entry) for entry in entries),
+            key=lambda item: (-item.date.toordinal(), item.record_id),
+        )
 
         lines = [self._build_header(year_month).rstrip()]
         for entry in sorted_entries:
@@ -101,6 +105,7 @@ class RegistryStore:
             lines.extend(self._format_summary_block(entry))
 
         path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+        self._write_month_html(path, sorted_entries)
         logger.info("Saved monthly deep-dive registry to %s", path)
         return path
 
@@ -159,6 +164,35 @@ class RegistryStore:
                     return entry
 
         raise KeyError(f"Registry entry not found: {record_id}")
+
+    def render_month_html(self, year_month: str) -> Path:
+        """Render the HTML companion for an existing month."""
+        path = self._ensure_month_file(year_month)
+        entries = self.load_month_entries(year_month)
+        return self._write_month_html(path, entries)
+
+    def render_all_html(self) -> list[Path]:
+        """Render HTML companions for all monthly registry files."""
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        rendered: list[Path] = []
+        for path in sorted(self.base_dir.glob("*-record.md")):
+            if path.name.endswith(".example.md"):
+                continue
+            rendered.append(self.render_month_html(path.name.removesuffix("-record.md")))
+        return rendered
+
+    def repair_summary_appendices(self) -> list[Path]:
+        """Rewrite registry files with cleaned summary appendix blocks."""
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        repaired: list[Path] = []
+        for path in sorted(self.base_dir.glob("*-record.md")):
+            if path.name.endswith(".example.md"):
+                continue
+            year_month = path.name.removesuffix("-record.md")
+            entries = self.load_month_entries(year_month)
+            target_date = date.fromisoformat(f"{year_month}-01")
+            repaired.append(self.save_month_entries(target_date, entries))
+        return repaired
 
     def _ensure_month_file(self, year_month: str) -> Path:
         self.base_dir.mkdir(parents=True, exist_ok=True)
@@ -244,7 +278,7 @@ class RegistryStore:
         )
 
     def _format_summary_block(self, entry: RegistryEntry) -> list[str]:
-        summary_body = entry.summary_markdown.strip() or "（无摘要）"
+        summary_body = self._clean_summary_markdown(entry.summary_markdown) or "（无摘要）"
         block = [
             f"### {entry.summary_ref}",
             f"<!-- record_id: {entry.record_id} -->",
@@ -258,6 +292,33 @@ class RegistryStore:
             "",
         ])
         return block
+
+    @classmethod
+    def _clean_entry_summary(cls, entry: RegistryEntry) -> RegistryEntry:
+        cleaned = cls._clean_summary_markdown(entry.summary_markdown)
+        if cleaned == entry.summary_markdown:
+            return entry
+        return entry.model_copy(update={"summary_markdown": cleaned})
+
+    @staticmethod
+    def _clean_summary_markdown(summary_markdown: str) -> str:
+        """Remove accidental report-level sections from compact registry summaries."""
+        cleaned_lines: list[str] = []
+        for line in summary_markdown.strip().splitlines():
+            stripped = line.strip()
+            if _REPORT_HEADING_IN_SUMMARY_RE.match(stripped):
+                break
+            cleaned_lines.append(line)
+
+        while cleaned_lines and not cleaned_lines[-1].strip():
+            cleaned_lines.pop()
+        return "\n".join(cleaned_lines).strip()
+
+    @staticmethod
+    def _write_month_html(path: Path, entries: list[RegistryEntry]) -> Path:
+        from src.reporters.registry_html_renderer import render_registry_month_file
+
+        return render_registry_month_file(path, entries)
 
     @staticmethod
     def _parse_summary_appendix(lines: list[str]) -> tuple[dict[str, str], dict[str, int]]:
