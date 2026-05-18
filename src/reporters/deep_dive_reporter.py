@@ -14,7 +14,7 @@ from src.llm.client import LLMClient
 from src.logging_config import get_logger
 from src.models.report import DeepAnalysis, DeepDiveReport, DeepSection
 from src.models.source import SourceItem, SourceType
-from src.reporters.html_renderer import render_html_report
+from src.reporters.html_renderer import DeepDiveItemMeta, render_html_report
 from src.storage.local_store import LocalStore
 from src.utils.markdown_math import normalize_markdown_math
 
@@ -38,6 +38,14 @@ _SOCIAL_HEADINGS = [
     "事件/项目概述", "技术实质分析", "社区反响与观点",
     "实际应用价值", "趋势展望", "相关链接",
 ]
+
+
+def _category_label(source_type: SourceType) -> str:
+    if source_type in _PAPER_TYPES:
+        return "论文"
+    if source_type in _INDUSTRY_TYPES:
+        return "业界动态"
+    return "社区热点"
 
 
 class DeepDiveReporter:
@@ -136,6 +144,16 @@ class DeepDiveReporter:
             report_kind="deep_dive",
             target_date=target_date,
             source_filename="deep_dive_report.md",
+            deep_dive_items=[
+                DeepDiveItemMeta(
+                    index=index,
+                    title=item.title,
+                    category=_category_label(item.source_type),
+                    source=item.source_name,
+                    url=item.url,
+                )
+                for index, item in selected
+            ],
         )
         self.store.save_report(target_date, "deep_dive.html", full_html)
         self.store.save_output(target_date, "deep_dive_report.html", full_html)
