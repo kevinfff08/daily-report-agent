@@ -293,6 +293,25 @@ def status() -> None:
     console.print(data_table)
 
 
+@app.command(name="app")
+def desktop_app(
+    target_date: str = typer.Option(None, "--date", "-d", help="Initial date (YYYY-MM-DD)"),
+) -> None:
+    """Launch the local pywebview desktop app."""
+    d = _parse_date(target_date)
+    try:
+        from src.desktop.app import DesktopDependencyError, launch_desktop_app
+    except ImportError as exc:
+        console.print(f"[red]Desktop app import failed: {exc}[/red]")
+        raise typer.Exit(1)
+
+    try:
+        launch_desktop_app(d)
+    except DesktopDependencyError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+
+
 @registry_app.command("show")
 def registry_show(
     month: str = typer.Option(None, "--month", help="仅显示指定月份的记录 (YYYY-MM)"),

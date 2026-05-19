@@ -4,6 +4,8 @@ PhD-level 每日情报工具，监控 arXiv、顶会/Blog、社区讨论、开�
 - Stage 1：`daily_report.md` / `daily_report.html`，适合 10-15 分钟快速浏览
 - Stage 2：`deep_dive_report.md` / `deep_dive_report.html`，针对你手选条目的深度分析
 
+DailyReport 支持双模式使用：完整 CLI 工作流用于命令行自动化和传统操作，同时提供本地桌面 App，把流程控制、HTML 报告阅读和台账状态维护合在同一个窗口中。
+
 ## 功能概览
 
 - 8 个数据源：arXiv、Semantic Scholar、Tavily、Product Hunt、Hacker News、YouTube、Bilibili、GitHub Trending
@@ -28,6 +30,12 @@ PhD-level 每日情报工具，监控 arXiv、顶会/Blog、社区讨论、开�
 ```bash
 conda activate research_tools
 pip install -e .
+```
+
+桌面 App 需要 `pywebview`，已包含在项目依赖中。当前 Windows/Python 3.14 环境默认使用 Qt 后端，因此还需要 `PySide6` 和 `QtPy`。如果 `pip install -e .` 在安装 `pywebview` 的 Windows 默认后端依赖时失败，可以在 `research_tools` 环境中使用：
+
+```bash
+python -m pip install --no-deps pywebview bottle proxy_tools QtPy PySide6
 ```
 
 开发环境：
@@ -144,7 +152,19 @@ python -m src.cli deep-dive --date 2026-03-25 --items "1,3,15"
 python -m src.cli html --date 2026-03-25
 python -m src.cli html --start-date 2026-03-01 --end-date 2026-05-31
 python -m src.cli html --all
+
+# 启动本地桌面 App（控制流程 + 内嵌 HTML 报告阅读）
+python -m src.cli app
+python -m src.cli app --date 2026-03-25
 ```
+
+## 桌面 App
+
+Windows 下可以双击 `start_app.bat` 启动桌面 App。`start.bat` 保留为传统 CLI 启动脚本，不改变原有命令行工作流。
+
+桌面 App 是本地 pywebview 窗口，不启动 HTTP 服务，也不对外暴露 API。左侧用于选择日期、运行 collect/report/run/html、选择 deep-dive 条目、刷新台账和写回关注状态；右侧直接内嵌显示 `daily_report.html`、`deep_dive_report.html` 和 `records/YYYY-MM-record.html`。在桌面 App 内打开台账 HTML 后，直接在 HTML 里勾选关注状态并点击“写回 Markdown”，会通过本地 Python bridge 更新同名 `records/YYYY-MM-record.md` 并刷新 HTML；普通浏览器打开该 HTML 时仍保留下载更新版 Markdown 的 fallback。
+
+如果 `LLM_MODE=setup-token`，`start_app.bat` 会沿用 `start.bat` 的逻辑先启动 CLIProxyAPI，再启动桌面 App。
 
 ## 长期台账
 
@@ -282,6 +302,7 @@ python -m pytest tests/ -v
 ```text
 src/
   cli.py
+  desktop/
   orchestrator.py
   llm/
   collectors/
@@ -294,6 +315,7 @@ src/
 ```
 
 其中：
+- `desktop/` 提供 pywebview 本地桌面壳，用于流程控制、后台任务状态和内嵌 HTML 报告阅读
 - `reporters/overview_reporter.py` 负责生成 `daily_report.md` 和 `overview_snippets.json`
 - `reporters/html_renderer.py` 负责把报告 Markdown 渲染为独立 HTML，并为历史报告补生成 HTML
 - `filters/recent_duplicates.py` 负责恢复近 3 天正文条目并计算跨天重复 penalty

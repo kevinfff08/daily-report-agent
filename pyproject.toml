@@ -1,10 +1,10 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "daily-report"
-version = "0.1.0"
+version = "0.2.0"
 description = "Daily intelligence aggregation system for AI/ML research"
 requires-python = ">=3.12"
 dependencies = [
@@ -16,6 +16,11 @@ dependencies = [
     "python-dotenv>=1.0",
     "PyYAML>=6.0",
     "pymupdf>=1.25",
+    "bottle>=0.13",
+    "proxy_tools>=0.1.0",
+    "QtPy>=2.4",
+    "PySide6>=6.11",
+    "pywebview>=5.0",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +36,9 @@ dailyreport = "src.cli:app"
 
 [tool.setuptools.packages.find]
 include = ["src*"]
+
+[tool.setuptools.package-data]
+"src.desktop" = ["static/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
