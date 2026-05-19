@@ -321,7 +321,7 @@ def render_markdown_body(
         if _is_horizontal_rule(stripped):
             close_overview_item()
             if report_kind == "deep_dive":
-                close_deep_section()
+                html_parts.append('<hr class="section-break">')
             else:
                 html_parts.append("<hr>")
             i += 1
