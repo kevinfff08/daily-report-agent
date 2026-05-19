@@ -203,6 +203,25 @@ class TestCLI:
         assert result.exit_code == 0
         assert "test-model" in result.output
 
+    def test_app_command_launches_desktop_app(self):
+        with patch("src.desktop.app.launch_desktop_app") as mock_launch:
+            result = runner.invoke(app, ["app", "--date", "2026-03-10"])
+
+        assert result.exit_code == 0
+        mock_launch.assert_called_once_with(date(2026, 3, 10))
+
+    def test_app_command_reports_missing_desktop_dependency(self):
+        from src.desktop.app import DesktopDependencyError
+
+        with patch(
+            "src.desktop.app.launch_desktop_app",
+            side_effect=DesktopDependencyError("pywebview missing"),
+        ):
+            result = runner.invoke(app, ["app"])
+
+        assert result.exit_code == 1
+        assert "pywebview missing" in result.output
+
     def test_registry_show_command(self):
         mock_store = MagicMock()
         mock_store.load_all_entries.return_value = [

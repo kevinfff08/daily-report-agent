@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DailyReport Desktop</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #eef1f4;
+      --panel: #fffdf8;
+      --surface: #ffffff;
+      --ink: #18202b;
+      --body: #2d3746;
+      --muted: #697585;
+      --line: #d9dee6;
+      --line-strong: #b7c0cc;
+      --blue: #174d7a;
+      --teal: #1d6f73;
+      --green: #2f6b4f;
+      --amber: #8a5a00;
+      --danger: #9a3a36;
+      --code: #111827;
+      --soft-blue: #edf4f9;
+      --soft-green: #edf7f2;
+      --soft-amber: #fff4d9;
+      --shadow: 0 16px 34px rgba(27, 34, 45, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: "Aptos", "Segoe UI", "Microsoft YaHei", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      height: 100vh;
+      min-height: 720px;
+    }
+
+    .app-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+      padding: 18px 22px 16px;
+      border-bottom: 1px solid var(--line-strong);
+      background: #fbfcfd;
+    }
+
+    .brand-kicker {
+      color: var(--teal);
+      font-size: 12px;
+      font-weight: 780;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    h1 {
+      margin: 4px 0 0;
+      font-size: 28px;
+      line-height: 1.16;
+      font-weight: 780;
+      text-wrap: pretty;
+    }
+
+    .header-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      justify-content: flex-end;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .meta-pill {
+      min-height: 26px;
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: var(--surface);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(330px, 390px) minmax(0, 1fr);
+      min-height: 0;
+    }
+
+    .control-pane {
+      min-height: 0;
+      overflow: auto;
+      padding: 18px;
+      border-right: 1px solid var(--line-strong);
+      background: #f7f9fb;
+    }
+
+    .viewer-pane {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-width: 0;
+      min-height: 0;
+      padding: 18px;
+      background: var(--page);
+    }
+
+    .section {
+      margin-bottom: 14px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 8px 20px rgba(27, 34, 45, 0.045);
+    }
+
+    .section h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      line-height: 1.25;
+      font-weight: 780;
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .field {
+      display: grid;
+      gap: 5px;
+    }
+
+    label,
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    input[type="date"],
+    input[type="month"],
+    input[type="text"] {
+      width: 100%;
+      min-height: 34px;
+      padding: 7px 9px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--ink);
+    }
+
+    input:focus-visible,
+    button:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 2px;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .command-button,
+    .secondary-button,
+    .text-button {
+      min-height: 34px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 760;
+      transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+    }
+
+    .command-button {
+      border: 1px solid #202635;
+      background: #202635;
+      color: #ffffff;
+    }
+
+    .command-button:hover:not(:disabled) {
+      background: #314052;
+    }
+
+    .secondary-button {
+      border: 1px solid var(--line-strong);
+      background: var(--surface);
+      color: var(--blue);
+    }
+
+    .secondary-button:hover:not(:disabled) {
+      border-color: var(--blue);
+      background: var(--soft-blue);
+    }
+
+    .text-button {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--teal);
+    }
+
+    .text-button:hover:not(:disabled) {
+      background: var(--soft-green);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .status-strip {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+
+    .status-strip[data-tone="ok"] {
+      border-color: #b8d4c0;
+      background: var(--soft-green);
+      color: var(--green);
+    }
+
+    .status-strip[data-tone="warn"] {
+      border-color: #e7d39a;
+      background: var(--soft-amber);
+      color: var(--amber);
+    }
+
+    .status-strip[data-tone="error"] {
+      border-color: #e0b7b4;
+      background: #fff1f0;
+      color: var(--danger);
+    }
+
+    .item-toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .item-list {
+      display: grid;
+      max-height: 250px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .empty-items {
+      padding: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .item-option {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 9px;
+      padding: 10px 11px;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+    }
+
+    .item-option:last-child {
+      border-bottom: 0;
+    }
+
+    .item-option:hover {
+      background: #f8fafc;
+    }
+
+    .item-option input {
+      margin-top: 3px;
+      accent-color: var(--blue);
+    }
+
+    .item-main {
+      min-width: 0;
+    }
+
+    .item-title {
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 720;
+      line-height: 1.35;
+      text-wrap: pretty;
+    }
+
+    .item-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 11.5px;
+      font-weight: 650;
+    }
+
+    .index-badge,
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 3px 6px;
+      border-radius: 5px;
+      background: #edf1f5;
+      color: #334155;
+      font-size: 11px;
+      font-weight: 780;
+      white-space: nowrap;
+    }
+
+    .status-controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 7px;
+      margin-top: 8px;
+    }
+
+    .status-option {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      min-height: 32px;
+      padding: 5px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: #344154;
+      font-size: 12.5px;
+      font-weight: 720;
+      cursor: pointer;
+    }
+
+    .status-option input {
+      accent-color: var(--blue);
+    }
+
+    .log-box {
+      min-height: 120px;
+      max-height: 220px;
+      overflow: auto;
+      margin: 0;
+      padding: 11px;
+      border: 1px solid #2b3545;
+      border-radius: 8px;
+      background: var(--code);
+      color: #e5edf6;
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .viewer-toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .viewer-title {
+      min-width: 0;
+    }
+
+    .viewer-title h2 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.3;
+      font-weight: 780;
+    }
+
+    .path-label {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .viewer-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .report-frame-shell {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .report-frame {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      border: 0;
+      background: #ffffff;
+    }
+
+    .empty-viewer {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      color: var(--muted);
+      text-align: center;
+      background: linear-gradient(180deg, #ffffff 0%, #f7f9fb 100%);
+    }
+
+    .empty-viewer[hidden] {
+      display: none;
+    }
+
+    .empty-viewer strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--ink);
+      font-size: 18px;
+    }
+
+    @media (max-width: 1120px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .control-pane {
+        max-height: 46vh;
+        border-right: 0;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .viewer-pane {
+        min-height: 54vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div>
+        <div class="brand-kicker">DailyReport Desktop</div>
+        <h1>每日情报工作台</h1>
+      </div>
+      <div class="header-meta">
+        <span class="meta-pill" id="providerPill">Provider: --</span>
+        <span class="meta-pill" id="modelPill">Model: --</span>
+        <span class="meta-pill" id="datePill">Date: --</span>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="control-pane" aria-label="DailyReport controls">
+        <section class="section">
+          <h2>运行设置</h2>
+          <div class="field-grid">
+            <div class="field">
+              <label for="dateInput">日期</label>
+              <input id="dateInput" type="date">
+            </div>
+            <div class="field">
+              <label for="sourcesInput">采集 sources，可留空</label>
+              <input id="sourcesInput" type="text" placeholder="arxiv,hackernews,tavily">
+            </div>
+          </div>
+          <div class="button-grid">
+            <button class="command-button" type="button" data-action="run">完整流程</button>
+            <button class="secondary-button" type="button" data-action="report">生成概览</button>
+            <button class="secondary-button" type="button" data-action="collect">只采集</button>
+            <button class="secondary-button" type="button" data-action="html">补生成 HTML</button>
+          </div>
+          <div class="status-strip" id="runStatus">等待启动。</div>
+        </section>
+
+        <section class="section">
+          <div class="item-toolbar">
+            <h2>深度分析条目</h2>
+            <button class="text-button" id="refreshItems" type="button">刷新条目</button>
+          </div>
+          <div class="item-list" id="itemList">
+            <div class="empty-items">生成概览后，这里会显示可选择的条目编号。</div>
+          </div>
+          <div class="field" style="margin-top: 10px;">
+            <label for="extraItemsInput">额外编号</label>
+            <input id="extraItemsInput" type="text" placeholder="1,3,15">
+          </div>
+          <button class="command-button" id="deepDiveButton" type="button" style="width: 100%; margin-top: 10px;">生成深度报告</button>
+        </section>
+
+        <section class="section">
+          <h2>台账</h2>
+          <div class="field-grid">
+            <div class="field">
+              <label for="monthInput">月份</label>
+              <input id="monthInput" type="month">
+            </div>
+            <div class="field">
+              <label for="recordIdInput">记录 ID</label>
+              <input id="recordIdInput" type="text" placeholder="20260325-001">
+            </div>
+          </div>
+          <div class="status-controls" aria-label="Interest status">
+            <label class="status-option"><input type="checkbox" value="star" data-registry-status> * 重点</label>
+            <label class="status-option"><input type="checkbox" value="question" data-registry-status> ? 学习</label>
+            <label class="status-option"><input type="checkbox" value="check" data-registry-status> ✓ 有用</label>
+          </div>
+          <div class="button-row">
+            <button class="secondary-button" id="registryHtmlButton" type="button">刷新台账 HTML</button>
+            <button class="secondary-button" id="loadRegistryButton" type="button">打开台账</button>
+            <button class="command-button" id="writeRegistryButton" type="button">写回状态</button>
+            <button class="text-button" id="clearRegistryButton" type="button">清空状态</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2>任务日志</h2>
+          <pre class="log-box" id="logBox">No task yet.</pre>
+        </section>
+      </aside>
+
+      <main class="viewer-pane">
+        <div class="viewer-toolbar">
+          <div class="viewer-title">
+            <h2 id="viewerTitle">报告阅读区</h2>
+            <div class="path-label" id="pathLabel">生成报告后会在这里显示 HTML。</div>
+          </div>
+          <div class="viewer-actions">
+            <button class="secondary-button" id="openOverviewButton" type="button">打开概览</button>
+            <button class="secondary-button" id="openDeepButton" type="button">打开深度报告</button>
+            <button class="secondary-button" id="openRegistryButton" type="button">打开台账</button>
+          </div>
+        </div>
+        <div class="report-frame-shell">
+          <iframe class="report-frame" id="reportFrame" title="DailyReport HTML report"></iframe>
+          <div class="empty-viewer" id="emptyViewer">
+            <div>
+              <strong>尚未加载报告</strong>
+              <span>左侧运行流程，完成后报告会直接显示在这里。</span>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      currentDate: '',
+      currentMonth: '',
+      selectedItems: new Set(),
+      pollingTimer: null,
+      busy: false,
+      initialized: false,
+    };
+
+    const els = {
+      dateInput: document.getElementById('dateInput'),
+      monthInput: document.getElementById('monthInput'),
+      sourcesInput: document.getElementById('sourcesInput'),
+      providerPill: document.getElementById('providerPill'),
+      modelPill: document.getElementById('modelPill'),
+      datePill: document.getElementById('datePill'),
+      runStatus: document.getElementById('runStatus'),
+      itemList: document.getElementById('itemList'),
+      extraItemsInput: document.getElementById('extraItemsInput'),
+      deepDiveButton: document.getElementById('deepDiveButton'),
+      refreshItems: document.getElementById('refreshItems'),
+      registryHtmlButton: document.getElementById('registryHtmlButton'),
+      loadRegistryButton: document.getElementById('loadRegistryButton'),
+      writeRegistryButton: document.getElementById('writeRegistryButton'),
+      clearRegistryButton: document.getElementById('clearRegistryButton'),
+      recordIdInput: document.getElementById('recordIdInput'),
+      logBox: document.getElementById('logBox'),
+      reportFrame: document.getElementById('reportFrame'),
+      emptyViewer: document.getElementById('emptyViewer'),
+      viewerTitle: document.getElementById('viewerTitle'),
+      pathLabel: document.getElementById('pathLabel'),
+      openOverviewButton: document.getElementById('openOverviewButton'),
+      openDeepButton: document.getElementById('openDeepButton'),
+      openRegistryButton: document.getElementById('openRegistryButton'),
+    };
+
+    function setStatus(text, tone = '') {
+      els.runStatus.textContent = text;
+      els.runStatus.dataset.tone = tone;
+    }
+
+    function setBusy(isBusy) {
+      state.busy = isBusy;
+      document.querySelectorAll('button, input').forEach((control) => {
+        if (control.id === 'dateInput' || control.id === 'monthInput') {
+          control.disabled = isBusy;
+          return;
+        }
+        control.disabled = isBusy;
+      });
+    }
+
+    async function callApi(method, ...args) {
+      if (!window.pywebview || !window.pywebview.api || !window.pywebview.api[method]) {
+        throw new Error('pywebview API is not ready.');
+      }
+      return window.pywebview.api[method](...args);
+    }
+
+    function syncDateState() {
+      state.currentDate = els.dateInput.value;
+      state.currentMonth = els.monthInput.value || (state.currentDate ? state.currentDate.slice(0, 7) : '');
+      els.datePill.textContent = `Date: ${state.currentDate || '--'}`;
+    }
+
+    function renderLogs(lines) {
+      els.logBox.textContent = lines && lines.length ? lines.join('\n') : 'No task output yet.';
+      els.logBox.scrollTop = els.logBox.scrollHeight;
+    }
+
+    function renderItems(items, message) {
+      state.selectedItems.clear();
+      els.itemList.replaceChildren();
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-items';
+        empty.textContent = message || '没有可选择条目。先生成概览报告。';
+        els.itemList.appendChild(empty);
+        return;
+      }
+
+      items.forEach((item) => {
+        const label = document.createElement('label');
+        label.className = 'item-option';
+
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = item.index;
+        input.addEventListener('change', () => {
+          if (input.checked) {
+            state.selectedItems.add(Number(input.value));
+          } else {
+            state.selectedItems.delete(Number(input.value));
+          }
+        });
+
+        const main = document.createElement('span');
+        main.className = 'item-main';
+        const title = document.createElement('span');
+        title.className = 'item-title';
+        title.textContent = item.title || `Item ${item.indexLabel}`;
+        const meta = document.createElement('span');
+        meta.className = 'item-meta';
+        meta.innerHTML = `<span class="index-badge">[${item.indexLabel}]</span><span>${escapeHtml(item.category || '')}</span><span>${escapeHtml(item.source || '')}</span>`;
+        main.append(title, meta);
+        label.append(input, main);
+        els.itemList.appendChild(label);
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    async function refreshItems() {
+      syncDateState();
+      const response = await callApi('list_items', state.currentDate);
+      if (!response.ok) {
+        setStatus(response.error || '读取条目失败。', 'error');
+        return;
+      }
+      renderItems(response.items || [], response.message);
+    }
+
+    async function loadReport(kind) {
+      syncDateState();
+      const response = await callApi('load_report', kind, state.currentDate);
+      if (!response.ok) {
+        setStatus(response.error || '报告不存在。', 'warn');
+        return;
+      }
+      showHtml(response.html, response.path, kind);
+      setStatus('报告已加载。', 'ok');
+    }
+
+    async function loadRegistry() {
+      syncDateState();
+      const response = await callApi('load_registry', state.currentMonth);
+      if (!response.ok) {
+        setStatus(response.error || '台账 HTML 不存在。', 'warn');
+        return;
+      }
+      showHtml(response.html, response.path, 'registry');
+      setStatus('台账已加载。', 'ok');
+    }
+
+    function showHtml(html, path, kind) {
+      els.emptyViewer.hidden = true;
+      els.reportFrame.onload = installEmbeddedReportNavigation;
+      els.reportFrame.srcdoc = html;
+      window.setTimeout(installEmbeddedReportNavigation, 0);
+      const labels = {
+        overview: '概览报告',
+        daily: '概览报告',
+        deep_dive: '深度报告',
+        'deep-dive': '深度报告',
+        registry: '长期台账',
+      };
+      els.viewerTitle.textContent = labels[kind] || 'HTML 报告';
+      els.pathLabel.textContent = path || '';
+    }
+
+    function installEmbeddedReportNavigation() {
+      const frame = els.reportFrame;
+      const frameWindow = frame.contentWindow;
+      const doc = frame.contentDocument || (frameWindow && frameWindow.document);
+      if (!doc || doc.__dailyReportEmbeddedNavigationInstalled) {
+        return;
+      }
+      doc.__dailyReportEmbeddedNavigationInstalled = true;
+      prepareEmbeddedRegistryWriteBack(doc);
+      doc.addEventListener('click', (event) => {
+        const link = event.target.closest && event.target.closest('a[href]');
+        if (!link) {
+          return;
+        }
+        const rawHref = (link.getAttribute('href') || '').trim();
+        if (!rawHref || rawHref === '#') {
+          event.preventDefault();
+          return;
+        }
+        if (rawHref.startsWith('#')) {
+          event.preventDefault();
+          scrollEmbeddedReportToAnchor(doc, rawHref.slice(1));
+          return;
+        }
+        if (rawHref.startsWith('about:srcdoc#')) {
+          event.preventDefault();
+          scrollEmbeddedReportToAnchor(doc, rawHref.slice('about:srcdoc#'.length));
+        }
+      }, true);
+    }
+
+    function prepareEmbeddedRegistryWriteBack(doc) {
+      const writeButton = doc.getElementById('writeMarkdown');
+      const registryStateNode = doc.getElementById('registry-state');
+      if (!writeButton || !registryStateNode) {
+        return;
+      }
+      writeButton.textContent = '写回 Markdown';
+      const helpText = writeButton.closest('.side-panel')?.querySelector('p');
+      if (helpText) {
+        helpText.textContent = '在 App 内勾选状态后，点击“写回 Markdown”会直接更新台账 Markdown 并刷新 HTML。';
+      }
+      writeButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        await writeEmbeddedRegistryStatuses(doc, registryStateNode);
+      }, true);
+    }
+
+    async function writeEmbeddedRegistryStatuses(doc, registryStateNode) {
+      const syncMessage = doc.getElementById('syncMessage');
+      try {
+        setEmbeddedRegistryMessage(syncMessage, '正在写回 Markdown ...', 'dirty');
+        const registryState = JSON.parse(registryStateNode.textContent || '{}');
+        const updates = collectEmbeddedRegistryUpdates(doc, registryState);
+        if (!updates.length) {
+          setEmbeddedRegistryMessage(syncMessage, '没有需要写回的状态变更。', 'ok');
+          setStatus('台账状态没有变化。', 'ok');
+          return;
+        }
+        for (const update of updates) {
+          const response = await callApi('update_registry_status', update.recordId, update.statuses, 'set');
+          if (!response.ok) {
+            throw new Error(response.error || `写回失败：${update.recordId}`);
+          }
+        }
+        setEmbeddedRegistryMessage(syncMessage, `已写回 ${updates.length} 条记录，正在刷新 HTML。`, 'ok');
+        await loadRegistry();
+        setStatus(`台账已写回 Markdown：${updates.length} 条记录。`, 'ok');
+      } catch (error) {
+        const message = error.message || String(error);
+        setEmbeddedRegistryMessage(syncMessage, `写回失败：${message}`, 'error');
+        setStatus(`台账写回失败：${message}`, 'error');
+      }
+    }
+
+    function collectEmbeddedRegistryUpdates(doc, registryState) {
+      const initial = new Map((registryState.entries || []).map((entry) => [
+        String(entry.recordId),
+        normalizeStatusList(entry.statuses || []),
+      ]));
+      const recordIds = new Set(Array.from(doc.querySelectorAll('input[data-record-id][data-status]')).map((input) => input.dataset.recordId));
+      const updates = [];
+      recordIds.forEach((recordId) => {
+        const statuses = normalizeStatusList(Array.from(
+          doc.querySelectorAll(`input[data-record-id="${cssEscape(recordId)}"][data-status]:checked`)
+        ).map((input) => input.dataset.status));
+        const previous = initial.get(recordId) || [];
+        if (statuses.join('|') !== previous.join('|')) {
+          updates.push({ recordId, statuses });
+        }
+      });
+      return updates;
+    }
+
+    function normalizeStatusList(statuses) {
+      const order = ['*', '?', '✓'];
+      const unique = new Set((statuses || []).map((status) => String(status).trim()).filter(Boolean));
+      return order.filter((status) => unique.has(status));
+    }
+
+    function setEmbeddedRegistryMessage(element, text, tone = '') {
+      if (!element) {
+        return;
+      }
+      element.textContent = text;
+      element.dataset.tone = tone;
+    }
+
+    function scrollEmbeddedReportToAnchor(doc, rawAnchor) {
+      const anchor = safeDecodeURIComponent(rawAnchor);
+      const target = doc.getElementById(anchor) || doc.querySelector(`[name="${cssEscape(anchor)}"]`);
+      if (target) {
+        target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      }
+    }
+
+    function safeDecodeURIComponent(value) {
+      try {
+        return decodeURIComponent(value);
+      } catch (_error) {
+        return value;
+      }
+    }
+
+    function cssEscape(value) {
+      if (window.CSS && typeof window.CSS.escape === 'function') {
+        return window.CSS.escape(value);
+      }
+      return String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+    }
+
+    async function runTask(action, payload) {
+      if (state.busy) {
+        return;
+      }
+      syncDateState();
+      setBusy(true);
+      setStatus(`正在启动 ${action} ...`, 'warn');
+      renderLogs([`Starting ${action}...`]);
+
+      try {
+        const response = await callApi('start_task', action, payload);
+        if (!response.ok) {
+          setStatus(response.error || '任务启动失败。', 'error');
+          setBusy(false);
+          return;
+        }
+        pollJob(response.job_id, action);
+      } catch (error) {
+        setStatus(error.message || String(error), 'error');
+        setBusy(false);
+      }
+    }
+
+    function pollJob(jobId, action) {
+      if (state.pollingTimer) {
+        window.clearInterval(state.pollingTimer);
+      }
+      state.pollingTimer = window.setInterval(async () => {
+        const response = await callApi('get_job', jobId);
+        if (!response.ok) {
+          window.clearInterval(state.pollingTimer);
+          state.pollingTimer = null;
+          setStatus(response.error || '无法读取任务状态。', 'error');
+          setBusy(false);
+          return;
+        }
+        const job = response.job;
+        renderLogs(job.logs || []);
+        setStatus(`${job.action}: ${job.status}`, job.status === 'failed' ? 'error' : 'warn');
+        if (job.status === 'queued' || job.status === 'running') {
+          return;
+        }
+
+        window.clearInterval(state.pollingTimer);
+        state.pollingTimer = null;
+        setBusy(false);
+        if (job.status === 'failed') {
+          setStatus(job.error || '任务失败。', 'error');
+          return;
+        }
+        setStatus('任务完成。', 'ok');
+        handleTaskResult(action, job.result || {});
+      }, 1000);
+    }
+
+    async function handleTaskResult(action, result) {
+      if (action === 'run' || action === 'report') {
+        await refreshItems();
+        await loadReport('overview');
+      } else if (action === 'deep_dive') {
+        await loadReport('deep_dive');
+      } else if (action === 'registry_html') {
+        await loadRegistry();
+      } else if (action === 'html') {
+        if (result.reports && result.reports.hasOverview) {
+          await loadReport('overview');
+        }
+      }
+    }
+
+    function checkedRegistryStatuses() {
+      return Array.from(document.querySelectorAll('[data-registry-status]:checked')).map((input) => input.value);
+    }
+
+    async function writeRegistryStatus(mode = 'set') {
+      const recordId = els.recordIdInput.value.trim();
+      if (!recordId) {
+        setStatus('请先填写记录 ID。', 'warn');
+        return;
+      }
+      const statuses = mode === 'clear' ? [] : checkedRegistryStatuses();
+      const response = await callApi('update_registry_status', recordId, statuses, mode);
+      if (!response.ok) {
+        setStatus(response.error || '写回台账失败。', 'error');
+        return;
+      }
+      setStatus(`台账已更新：${response.recordId} -> ${response.statusDisplay || '(空)'}`, 'ok');
+      els.monthInput.value = response.month || els.monthInput.value;
+      await loadRegistry();
+    }
+
+    async function init() {
+      if (state.initialized) {
+        return;
+      }
+      state.initialized = true;
+      try {
+        const status = await callApi('get_status');
+        if (status.defaultDate) {
+          els.dateInput.value = status.defaultDate;
+        }
+        if (status.defaultMonth) {
+          els.monthInput.value = status.defaultMonth;
+        }
+        syncDateState();
+        if (status.system) {
+          els.providerPill.textContent = `Provider: ${status.system.llm_provider || '--'}`;
+          els.modelPill.textContent = `Model: ${status.system.llm_model || '--'}`;
+        }
+        if (!status.ok) {
+          setStatus(status.error || '系统状态读取失败。', 'warn');
+        }
+        await refreshItems();
+      } catch (error) {
+        setStatus(error.message || String(error), 'error');
+      }
+    }
+
+    document.querySelectorAll('[data-action]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const action = button.dataset.action;
+        const payload = { date: els.dateInput.value };
+        if (action === 'collect') {
+          payload.sources = els.sourcesInput.value;
+        }
+        runTask(action, payload);
+      });
+    });
+
+    els.deepDiveButton.addEventListener('click', () => {
+      runTask('deep_dive', {
+        date: els.dateInput.value,
+        items: Array.from(state.selectedItems),
+        extraItems: els.extraItemsInput.value,
+      });
+    });
+    els.registryHtmlButton.addEventListener('click', () => runTask('registry_html', {
+      date: els.dateInput.value,
+      month: els.monthInput.value,
+    }));
+    els.refreshItems.addEventListener('click', refreshItems);
+    els.loadRegistryButton.addEventListener('click', loadRegistry);
+    els.writeRegistryButton.addEventListener('click', () => writeRegistryStatus('set'));
+    els.clearRegistryButton.addEventListener('click', () => writeRegistryStatus('clear'));
+    els.openOverviewButton.addEventListener('click', () => loadReport('overview'));
+    els.openDeepButton.addEventListener('click', () => loadReport('deep_dive'));
+    els.openRegistryButton.addEventListener('click', loadRegistry);
+    els.dateInput.addEventListener('change', () => {
+      syncDateState();
+      refreshItems();
+    });
+    els.monthInput.addEventListener('change', syncDateState);
+
+    window.addEventListener('pywebviewready', init);
+    if (window.pywebview && window.pywebview.api) {
+      init();
+    }
+  </script>
+</body>
+</html>
