@@ -191,6 +191,7 @@ def render_markdown_body(
     skipped_title = False
     open_overview_item = False
     open_deep_section = False
+    open_deep_section_lazy = False
     open_deep_item = False
     deep_items = deep_dive_items or []
     deep_item_cursor = -1
@@ -207,10 +208,11 @@ def render_markdown_body(
             open_overview_item = False
 
     def close_deep_section() -> None:
-        nonlocal open_deep_section
+        nonlocal open_deep_section, open_deep_section_lazy
         if open_deep_section:
-            html_parts.append("</div></section>")
+            html_parts.append("</template></section>" if open_deep_section_lazy else "</div></section>")
             open_deep_section = False
+            open_deep_section_lazy = False
 
     def close_deep_item() -> None:
         nonlocal open_deep_item
@@ -287,17 +289,19 @@ def render_markdown_body(
 
                 if deep_current_group is not None:
                     deep_current_group.headings.append(heading)
+                open_by_default = deep_item_cursor == 0 and deep_section_count_for_item == 0
                 html_parts.append(
                     _render_deep_section_open(
                         text,
                         anchor,
-                        open_by_default=deep_item_cursor == 0 and deep_section_count_for_item == 0,
+                        open_by_default=open_by_default,
                     )
                 )
                 deep_item_has_section = True
                 deep_seen_terminal_section = _is_terminal_deep_section(heading.text)
                 deep_section_count_for_item += 1
                 open_deep_section = True
+                open_deep_section_lazy = not open_by_default
                 i += 1
                 continue
 
@@ -805,13 +809,23 @@ def _render_deep_section_open(
 ) -> str:
     open_class = " is-open" if open_by_default else ""
     expanded = "true" if open_by_default else "false"
-    hidden_attr = "" if open_by_default else " hidden"
     body_id = _section_body_id(anchor)
     heading = _render_deep_section_toggle_heading(text, anchor, body_id, expanded)
+    escaped_body_id = html.escape(body_id, quote=True)
+    if not open_by_default:
+        return (
+            f'<section class="analysis-section{open_class}">'
+            f"{heading}"
+            f'<div class="analysis-body" id="{escaped_body_id}" hidden '
+            f'data-lazy-panel="{escaped_body_id}">'
+            '<div class="lazy-placeholder">展开后加载本节正文</div>'
+            "</div>"
+            f'<template data-lazy-template="{escaped_body_id}">'
+        )
     return (
         f'<section class="analysis-section{open_class}">'
         f"{heading}"
-        f'<div class="analysis-body" id="{body_id}"{hidden_attr}>'
+        f'<div class="analysis-body" id="{escaped_body_id}">'
     )
 
 
@@ -1234,6 +1248,28 @@ def _date_in_range(value: date, start: date | None, end: date | None) -> bool:
 
 
 _COLLAPSE_SCRIPT = r"""
+    function hydrateLazyPanel(panel) {
+      const key = panel.dataset.lazyPanel;
+      if (!key || panel.dataset.lazyLoaded === 'true') {
+        return;
+      }
+      const template = Array.from(document.querySelectorAll('template[data-lazy-template]'))
+        .find((item) => item.dataset.lazyTemplate === key);
+      if (!template) {
+        return;
+      }
+      panel.replaceChildren(template.content.cloneNode(true));
+      panel.dataset.lazyLoaded = 'true';
+      template.remove();
+    }
+
+    function typesetPanel(panel) {
+      if (!window.MathJax || !window.MathJax.typesetPromise) {
+        return;
+      }
+      window.MathJax.typesetPromise([panel]).catch(() => {});
+    }
+
     document.addEventListener('click', function (event) {
       const toggle = event.target.closest('[data-collapse-toggle]');
       if (!toggle) {
@@ -1244,11 +1280,17 @@ _COLLAPSE_SCRIPT = r"""
         return;
       }
       const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      if (!expanded) {
+        hydrateLazyPanel(panel);
+      }
       toggle.setAttribute('aria-expanded', String(!expanded));
       panel.hidden = expanded;
       const container = toggle.closest('.deep-item, .analysis-section');
       if (container) {
         container.classList.toggle('is-open', !expanded);
+      }
+      if (!expanded) {
+        typesetPanel(panel);
       }
     });
 
@@ -1769,6 +1811,12 @@ _REPORT_CSS = r"""
       padding: 4px 22px 22px;
       border-top: 1px solid var(--line);
       background: var(--paper);
+    }
+
+    .lazy-placeholder {
+      padding: 18px 0;
+      color: var(--muted);
+      font-size: 13px;
     }
 
     .analysis-body > :last-child {

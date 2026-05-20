@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "daily-report"
-version = "0.2.0"
+version = "0.2.1"
 description = "Daily intelligence aggregation system for AI/ML research"
 requires-python = ">=3.12"
 dependencies = [
