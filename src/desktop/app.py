@@ -58,7 +58,22 @@ def _prepare_backend_environment(gui: str | None) -> None:
     """Set backend-specific environment defaults before pywebview starts."""
     if gui == "qt":
         os.environ.setdefault("QTWEBENGINE_DISABLE_SANDBOX", "1")
-        os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox")
+        os.environ.setdefault("QT_OPENGL", "software")
+        os.environ.setdefault("QT_QUICK_BACKEND", "software")
+        chromium_flags = [
+            "--no-sandbox",
+            "--disable-gpu",
+            "--disable-gpu-compositing",
+            "--disable-accelerated-2d-canvas",
+            "--disable-zero-copy",
+            "--disable-features=CanvasOopRasterization,VizDisplayCompositor",
+        ]
+        existing_flags = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
+        merged_flags = existing_flags.split()
+        for flag in chromium_flags:
+            if flag not in merged_flags:
+                merged_flags.append(flag)
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = " ".join(merged_flags).strip()
 
 
 def launch_desktop_app(default_date: date | None = None) -> None:

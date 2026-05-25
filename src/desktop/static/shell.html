@@ -24,7 +24,7 @@
       --soft-blue: #edf4f9;
       --soft-green: #edf7f2;
       --soft-amber: #fff4d9;
-      --shadow: 0 16px 34px rgba(27, 34, 45, 0.08);
+      --shadow: none;
     }
 
     * {
@@ -130,7 +130,6 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
-      box-shadow: 0 8px 20px rgba(27, 34, 45, 0.045);
     }
 
     .section h2 {
@@ -197,7 +196,6 @@
       cursor: pointer;
       font-size: 13px;
       font-weight: 760;
-      transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
     }
 
     .command-button {
@@ -436,7 +434,6 @@
       border: 1px solid var(--line-strong);
       border-radius: 8px;
       background: var(--surface);
-      box-shadow: var(--shadow);
     }
 
     .report-frame {
@@ -770,6 +767,7 @@
         return;
       }
       doc.__dailyReportEmbeddedNavigationInstalled = true;
+      installEmbeddedStableRendering(doc);
       prepareEmbeddedRegistryWriteBack(doc);
       doc.addEventListener('click', (event) => {
         const link = event.target.closest && event.target.closest('a[href]');
@@ -791,6 +789,65 @@
           scrollEmbeddedReportToAnchor(doc, rawHref.slice('about:srcdoc#'.length));
         }
       }, true);
+    }
+
+    function installEmbeddedStableRendering(doc) {
+      doc.documentElement.classList.add('dailyreport-embedded-root');
+      if (doc.body) {
+        doc.body.classList.add('dailyreport-app-view');
+      }
+      if (doc.getElementById('dailyreport-app-stability-style')) {
+        return;
+      }
+      const style = doc.createElement('style');
+      style.id = 'dailyreport-app-stability-style';
+      style.textContent = `
+        html {
+          scroll-behavior: auto !important;
+        }
+        body,
+        .report-content,
+        .entry-summary {
+          font-family: "Aptos", "Segoe UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif !important;
+        }
+        *,
+        *::before,
+        *::after {
+          transition: none !important;
+          animation: none !important;
+          transform: none !important;
+          will-change: auto !important;
+          backface-visibility: visible !important;
+        }
+        .report-toc,
+        th,
+        .registry-side,
+        .summary-table th {
+          position: static !important;
+          top: auto !important;
+          max-height: none !important;
+          overflow: visible !important;
+        }
+        .brief-item,
+        .deep-item,
+        .table-wrap,
+        .math-block,
+        .report-frame-shell,
+        .summary-table-wrap,
+        .registry-entry {
+          box-shadow: none !important;
+        }
+        .report-layout,
+        .registry-layout {
+          align-items: start !important;
+        }
+        .table-wrap,
+        pre,
+        .math-block {
+          contain: none !important;
+        }
+      `;
+      doc.head.appendChild(style);
     }
 
     function prepareEmbeddedRegistryWriteBack(doc) {
@@ -876,7 +933,7 @@
       const anchor = safeDecodeURIComponent(rawAnchor);
       const target = doc.getElementById(anchor) || doc.querySelector(`[name="${cssEscape(anchor)}"]`);
       if (target) {
-        target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        target.scrollIntoView({ block: 'start', behavior: 'auto' });
       }
     }
 
