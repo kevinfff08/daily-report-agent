@@ -32,8 +32,8 @@ logger = get_logger("orchestrator")
 
 _DEFAULT_PAPER_MAX_CHARS = {
     "anthropic": 40_000,
-    "openai": 120_000,
-    "deepseek": 120_000,
+    "openai": 80_000,
+    "deepseek": 80_000,
 }
 _DEFAULT_DEEP_DIVE_MAX_TOKENS = {
     "anthropic": 8192,

@@ -7,7 +7,9 @@ get full page content and supplementary search results.
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
+from pathlib import Path
 
 from src.enrichers import enrich_item
 from src.llm.client import LLMClient
@@ -38,6 +40,7 @@ _SOCIAL_HEADINGS = [
     "事件/项目概述", "技术实质分析", "社区反响与观点",
     "实际应用价值", "趋势展望", "相关链接",
 ]
+_CHECKPOINT_DIR = "deep_dive_items"
 
 
 def _category_label(source_type: SourceType) -> str:
@@ -119,7 +122,12 @@ class DeepDiveReporter:
         ]
 
         for idx, item in selected:
-            analysis, md = await self._analyze_single(idx, item)
+            checkpoint = self._load_item_checkpoint(target_date, idx, item)
+            if checkpoint is not None:
+                analysis, md = checkpoint
+            else:
+                analysis, md = await self._analyze_single(idx, item)
+                self._save_item_checkpoint(target_date, idx, item, analysis, md)
             analyses.append(analysis)
             markdown_parts.append(md)
 
@@ -160,6 +168,84 @@ class DeepDiveReporter:
 
         logger.info("Deep dive report saved to %s", output_path)
         return report, full_markdown
+
+    def _checkpoint_paths(self, target_date: date, index: int) -> tuple[Path, Path]:
+        checkpoint_dir = (
+            self.store.data_dir
+            / "reports"
+            / self.store.relative_date_dir(target_date)
+            / _CHECKPOINT_DIR
+        )
+        stem = f"{index:03d}"
+        return checkpoint_dir / f"{stem}.json", checkpoint_dir / f"{stem}.md"
+
+    def _load_item_checkpoint(
+        self,
+        target_date: date,
+        index: int,
+        item: SourceItem,
+    ) -> tuple[DeepAnalysis, str] | None:
+        json_path, md_path = self._checkpoint_paths(target_date, index)
+        if not json_path.exists() or not md_path.exists():
+            return None
+
+        try:
+            payload = json.loads(json_path.read_text(encoding="utf-8"))
+            markdown = md_path.read_text(encoding="utf-8")
+            if not markdown.strip():
+                return None
+
+            if (
+                payload.get("index") != index
+                or payload.get("title") != item.title
+                or payload.get("source_type") != item.source_type.value
+            ):
+                logger.info(
+                    "Ignoring stale deep-dive checkpoint for [%03d]: metadata mismatch",
+                    index,
+                )
+                return None
+
+            analysis = DeepAnalysis.model_validate(payload["analysis"])
+            if (
+                analysis.index != index
+                or analysis.title != item.title
+                or analysis.source_type != item.source_type.value
+            ):
+                logger.info(
+                    "Ignoring stale deep-dive checkpoint for [%03d]: analysis mismatch",
+                    index,
+                )
+                return None
+
+            logger.info("Reusing deep-dive checkpoint for [%03d] %s", index, item.title)
+            return analysis, markdown
+        except Exception as exc:
+            logger.warning("Failed to load deep-dive checkpoint for [%03d]: %s", index, exc)
+            return None
+
+    def _save_item_checkpoint(
+        self,
+        target_date: date,
+        index: int,
+        item: SourceItem,
+        analysis: DeepAnalysis,
+        markdown: str,
+    ) -> None:
+        json_path, md_path = self._checkpoint_paths(target_date, index)
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        md_path.write_text(markdown, encoding="utf-8")
+        payload = {
+            "index": index,
+            "title": item.title,
+            "source_type": item.source_type.value,
+            "analysis": analysis.model_dump(mode="json"),
+        }
+        json_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
+        logger.info("Saved deep-dive checkpoint for [%03d] to %s", index, json_path.parent)
 
     async def _analyze_single(self, index: int, item: SourceItem) -> tuple[DeepAnalysis, str]:
         """Generate deep analysis for a single item with enriched content."""

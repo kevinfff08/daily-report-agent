@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 from typing import Any, Literal
@@ -16,13 +17,12 @@ logger = get_logger("llm.client")
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts" / "v1"
 
-# Retry config for transient API errors (429, 529, 500, 502, 503)
-_MAX_RETRIES = 5
+# Retry config for LLM HTTP request errors.
+_MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 2.0  # seconds
-_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504, 529}
 _OPENAI_BASE_URL = "https://api.openai.com/v1"
 _DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
-_OPENAI_TIMEOUT_SECONDS = 180.0
+_OPENAI_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "300"))
 
 
 def _default_model(provider: str) -> str:
@@ -111,31 +111,35 @@ class LLMClient:
         t0 = time.time()
 
         last_err: Exception | None = None
-        for attempt in range(_MAX_RETRIES):
+        for attempt in range(1, _MAX_RETRIES + 1):
             try:
                 if self.provider == "anthropic":
                     return self._generate_anthropic(prompt, system, max_tokens, temperature, t0)
                 return self._generate_openai_compatible(prompt, system, max_tokens, temperature, t0)
-            except APIStatusError as e:
+            except (APIStatusError, httpx.HTTPError) as e:
                 last_err = e
-                status_code = e.status_code
-                message = e.message
-            except httpx.HTTPStatusError as e:
-                last_err = e
-                status_code = e.response.status_code
-                message = e.response.text[:200]
+                message = self._format_http_error(e)
 
-            if status_code not in _RETRYABLE_STATUS_CODES:
-                raise last_err
+            if attempt >= _MAX_RETRIES:
+                break
 
-            delay = _RETRY_BASE_DELAY * (2 ** attempt)
+            delay = _RETRY_BASE_DELAY * (2 ** (attempt - 1))
             logger.warning(
-                "LLM API error %d (provider=%s, attempt %d/%d), retrying in %.0fs: %s",
-                status_code, self.provider, attempt + 1, _MAX_RETRIES, delay, message,
+                "LLM HTTP request error (provider=%s, attempt %d/%d), retrying in %.0fs: %s",
+                self.provider, attempt, _MAX_RETRIES, delay, message,
             )
             time.sleep(delay)
 
         raise last_err  # type: ignore[misc]
+
+    @staticmethod
+    def _format_http_error(exc: APIStatusError | httpx.HTTPError) -> str:
+        """Format retryable HTTP-layer errors without dumping large responses."""
+        if isinstance(exc, APIStatusError):
+            return f"{exc.status_code}: {exc.message}"
+        if isinstance(exc, httpx.HTTPStatusError):
+            return f"{exc.response.status_code}: {exc.response.text[:200]}"
+        return f"{type(exc).__name__}: {str(exc)[:200]}"
 
     def _generate_anthropic(
         self,

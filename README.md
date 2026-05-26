@@ -65,12 +65,13 @@ ANTHROPIC_API_KEY=sk-ant-...
 # DEEPSEEK_API_KEY=sk-...
 # LLM_PROXY_URL=http://localhost:8317
 # LLM_MODEL=gpt-4.1-mini
+# LLM_TIMEOUT_SECONDS=300
 
 # Optional: deep-dive paper input length limit (characters)
 # - Anthropic default: 40000
-# - OpenAI default: 120000
-# - DeepSeek default: 120000
-# PAPER_MAX_CHARS=120000
+# - OpenAI default: 80000
+# - DeepSeek default: 80000
+# PAPER_MAX_CHARS=80000
 
 # Optional: deep-dive output token limit
 # - Anthropic default: 8192
@@ -105,14 +106,16 @@ OpenAI 适配会自动把 `LLM_PROXY_URL` 规范到 `/v1`，例如 `http://local
   控制 deep-dive 中论文正文输入给 LLM 前的字符上限。PDF 抽取文本和论文页回退文本都会按这个上限截断。
 - `DEEP_DIVE_MAX_TOKENS`
   控制 deep-dive 单条条目生成时传给 LLM 的输出 token 上限。
+- `LLM_TIMEOUT_SECONDS`
+  控制 OpenAI-compatible / CLIProxy HTTP 请求超时时间，默认 300 秒。
 
 默认值：
 
 - Anthropic：`PAPER_MAX_CHARS=40000`，`DEEP_DIVE_MAX_TOKENS=8192`
-- OpenAI：`PAPER_MAX_CHARS=120000`，`DEEP_DIVE_MAX_TOKENS=12000`
-- DeepSeek：`PAPER_MAX_CHARS=120000`，`DEEP_DIVE_MAX_TOKENS=12000`
+- OpenAI：`PAPER_MAX_CHARS=80000`，`DEEP_DIVE_MAX_TOKENS=12000`
+- DeepSeek：`PAPER_MAX_CHARS=80000`，`DEEP_DIVE_MAX_TOKENS=12000`
 
-如果你在 `.env` 里显式设置了这两个参数，则会覆盖 provider 默认值，并且对 Anthropic / OpenAI / DeepSeek 通用生效。
+如果你在 `.env` 里显式设置了 `PAPER_MAX_CHARS` 或 `DEEP_DIVE_MAX_TOKENS`，则会覆盖 provider 默认值，并且对 Anthropic / OpenAI / DeepSeek 通用生效。
 
 ### `config/sources.yaml`
 
