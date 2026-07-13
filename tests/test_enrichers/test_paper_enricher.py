@@ -105,7 +105,8 @@ class TestPaperEnricher:
 
     @pytest.mark.asyncio
     async def test_enrich_download_failure(self, paper_enricher: PaperEnricher, arxiv_item: SourceItem) -> None:
-        with patch.object(paper_enricher, "_download_pdf", new_callable=AsyncMock, side_effect=Exception("timeout")):
+        with patch.object(paper_enricher, "_download_pdf", new_callable=AsyncMock, side_effect=Exception("timeout")), \
+             patch.object(paper_enricher, "_fetch_source", new_callable=AsyncMock, side_effect=Exception("fallback unavailable")):
             result = await paper_enricher.enrich(arxiv_item)
         assert result == ""
 
@@ -145,9 +146,25 @@ class TestPaperEnricher:
         assert "article full text fallback" in result
 
     @pytest.mark.asyncio
+    async def test_enrich_fallback_text_truncated_by_caller(
+        self,
+        paper_enricher_custom_limit: PaperEnricher,
+        s2_item_no_pdf: SourceItem,
+    ) -> None:
+        # Regression: the HTML fallback used to reference an undefined
+        # _MAX_PDF_CHARS constant; truncation now happens in the caller via
+        # self.max_chars, so a long landing page must be capped at that limit.
+        html = "<html><body><p>" + ("word " * 50_000) + "</p></body></html>"
+        response_html = {"kind": "html", "content": html.encode("utf-8"), "url": "https://publisher.example/article"}
+        with patch.object(paper_enricher_custom_limit, "_fetch_source", new_callable=AsyncMock, return_value=response_html):
+            result = await paper_enricher_custom_limit.enrich(s2_item_no_pdf)
+        assert len(result) == 12_345
+
+    @pytest.mark.asyncio
     async def test_enrich_extract_failure(self, paper_enricher: PaperEnricher, arxiv_item: SourceItem) -> None:
         with patch.object(paper_enricher, "_download_pdf", new_callable=AsyncMock, return_value=b"bad"), \
-             patch.object(paper_enricher, "_extract_text", side_effect=Exception("corrupt PDF")):
+             patch.object(paper_enricher, "_extract_text", side_effect=Exception("corrupt PDF")), \
+             patch.object(paper_enricher, "_fetch_source", new_callable=AsyncMock, side_effect=Exception("fallback unavailable")):
             result = await paper_enricher.enrich(arxiv_item)
         assert result == ""
 

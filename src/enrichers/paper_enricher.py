@@ -231,4 +231,6 @@ class _HTMLTextExtractor(HTMLParser):
         text = " ".join(self._parts)
         lines = [" ".join(line.split()) for line in text.splitlines()]
         cleaned = "\n".join(line for line in lines if line)
-        return cleaned[:_MAX_PDF_CHARS]
+        # Truncation is handled by the caller via ``self.max_chars`` to respect
+        # the user-configured limit and avoid double-truncation.
+        return cleaned
